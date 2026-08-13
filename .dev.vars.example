@@ -1,0 +1,5 @@
+ENVIRONMENT="development"
+DEV_USER_EMAIL="usuario@empresa.invalid"
+MS_TENANT_ID=""
+MS_CLIENT_ID=""
+MS_CLIENT_SECRET=""

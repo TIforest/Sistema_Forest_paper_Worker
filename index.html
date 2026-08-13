@@ -1,0 +1,2257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<title>Forest Paper — Qualidade &amp; Produção</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    /* Paleta oficial Forest */
+    --verde-claro:#C5F249;
+    --verde-escuro:#0A252A;
+    --kraft:#B19873;
+    --kraft-dim:#8C7355;
+    --roxo:#C1B4EE;
+    --roxo-dim:#7A6DAE;
+
+    --ink:#0A252A;
+    --paper:#F3EEE3;
+    --paper-2:#E9DFCC;
+    --forest-deep:#0A252A;
+    --forest-mid:#123138;
+    --line-dark:rgba(10,37,42,0.14);
+    --line-dark-2:rgba(10,37,42,0.08);
+    --amber:#C5F249;
+    --amber-dim:#8C7355;
+    --red:#B5473A;
+    --green:#0A252A;
+    --steel:#8C7355;
+    --soft:#465C60;
+    --focus:#6B4FD3;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;font-size:clamp(16px, 0.35vw + 14px, 19px);line-height:1.5;}
+  h1,h2,h3,h4{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:0.02em;margin:0;font-weight:600;}
+  .app{max-width:1180px;margin:0 auto;padding:0 28px 70px;}
+
+  /* header */
+  .topbar{background:var(--forest-deep);color:var(--paper);padding:22px 0;margin-bottom:0;}
+  .topbar-inner{max-width:1180px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
+  .brand{display:flex;align-items:center;gap:10px;font-size:17px;letter-spacing:0.03em;}
+  .brand .mark{width:10px;height:10px;background:var(--amber);transform:rotate(45deg);flex-shrink:0;}
+  .brand small{display:block;font-family:'IBM Plex Mono',monospace;text-transform:none;letter-spacing:0;font-size:11.5px;color:rgba(237,234,224,0.6);margin-top:2px;}
+  .clock{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:rgba(237,234,224,0.75);text-align:right;}
+  .clock b{color:var(--amber);}
+
+  /* tabs */
+  .tabs{display:flex;gap:2px;margin:26px 0 28px;border-bottom:1px solid var(--line-dark);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}
+  .tabs::-webkit-scrollbar{height:4px;}
+  .tabs::-webkit-scrollbar-thumb{background:var(--line-dark);}
+  .tab-btn{
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-transform:uppercase;letter-spacing:0.06em;
+    background:none;border:none;padding:14px 18px;min-height:48px;cursor:pointer;color:var(--soft);
+    border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;flex-shrink:0;
+  }
+  .tab-btn.active{color:var(--ink);border-bottom-color:var(--amber);font-weight:600;}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* cards / kpis */
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line-dark);border:1px solid var(--line-dark);margin-bottom:32px;}
+  .kpi-row.three{grid-template-columns:repeat(3,1fr);}
+  .kpi{background:var(--paper);padding:20px 22px;}
+  .kpi .lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--soft);margin-bottom:8px;}
+  .kpi .val{font-family:'Oswald',sans-serif;font-size:28px;font-weight:600;}
+  .kpi .val.red{color:var(--red);}
+  .kpi .val.green{color:var(--green);}
+  .kpi .val.amber{color:var(--roxo-dim);}
+  @media (max-width:820px){.kpi-row{grid-template-columns:repeat(2,1fr);}}
+
+  /* form */
+  .panel-box{background:#fff;border:1px solid var(--line-dark);border-radius:3px;padding:30px;margin-bottom:28px;}
+  .panel-box h3{font-size:16px;margin-bottom:20px;}
+  .form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field.full{grid-column:1/-1;}
+  .field label{font-family:'IBM Plex Mono',monospace;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:#31484D;font-weight:600;}
+  .field input, .field select, .field textarea{
+    border:1px solid var(--line-dark);border-radius:2px;padding:10px 12px;font-family:'IBM Plex Sans',sans-serif;
+    font-size:16px;min-height:46px;background:#fff;color:var(--ink);
+  }
+  .field textarea{resize:vertical;min-height:64px;}
+  .field input:focus, .field select:focus, .field textarea:focus{outline:3px solid rgba(107,79,211,.22);outline-offset:1px;border-color:var(--focus);}
+
+  /* grupo numérico com unidade fixa (não editável) */
+  .unit-group{display:flex;align-items:stretch;border:1px solid var(--line-dark);border-radius:2px;background:var(--paper);overflow:hidden;}
+  .unit-group input{border:none;background:transparent;flex:1;min-width:0;border-radius:0;padding:10px 12px;font-family:'IBM Plex Sans',sans-serif;font-size:14.5px;}
+  .unit-group input:focus{outline:none;}
+  .unit-group.focus-ring{border-color:var(--amber-dim);}
+  .unit-group .unit-suffix{
+    flex-shrink:0;background:var(--paper-2);color:var(--soft);font-family:'IBM Plex Mono',monospace;
+    font-size:12px;display:flex;align-items:center;padding:0 12px;border-left:1px solid var(--line-dark);white-space:nowrap;
+  }
+  .unit-group .dim-x{flex-shrink:0;display:flex;align-items:center;padding:0 6px;color:var(--soft);font-family:'IBM Plex Mono',monospace;}
+  .spec-toggle{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--steel);background:none;border:none;cursor:pointer;
+    padding:5px 0 0;text-align:left;text-decoration:underline;
+  }
+  .spec-row{display:none;gap:8px;margin-top:6px;}
+  .spec-row.open{display:flex;}
+  .spec-row input{border:1px solid var(--line-dark);border-radius:2px;padding:6px 8px;font-size:12px;width:100%;font-family:'IBM Plex Mono',monospace;}
+  .deviation-msg{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--red);margin-top:5px;display:none;}
+  .deviation-msg.show{display:block;}
+  .alerts-box{
+    border:1px solid var(--red);background:rgba(181,71,58,0.06);border-radius:3px;padding:14px 16px;margin-bottom:22px;display:none;
+  }
+  .alerts-box.show{display:block;}
+  .alerts-box .at{font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--red);margin-bottom:8px;font-weight:600;}
+  .alerts-box ul{margin:0;padding-left:18px;font-size:13px;color:var(--ink);}
+  .section-divider{grid-column:1/-1;border-top:1px solid var(--line-dark);margin:8px 0 4px;padding-top:16px;}
+  .section-divider h4{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--soft);font-family:'IBM Plex Mono',monospace;margin:0;}
+  .extra-section{display:none;}
+  .extra-section.open{display:contents;}
+  .status-choice{display:flex;gap:10px;}
+  .status-choice label{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+    border:1px solid var(--line-dark);border-radius:2px;padding:10px 8px;cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-transform:uppercase;color:var(--soft);
+  }
+  .status-choice input{display:none;}
+  .status-choice input:checked + span{font-weight:600;}
+  .status-choice label:has(input:checked){border-color:var(--ink);color:var(--ink);}
+  .status-choice.aprovado label:has(input:checked){border-color:var(--green);color:var(--green);background:rgba(197,242,73,0.28);}
+  .status-choice.reprovado label:has(input:checked){border-color:var(--red);color:var(--red);background:rgba(181,71,58,0.08);}
+  .status-choice.pendente label:has(input:checked){border-color:var(--roxo-dim);color:var(--roxo-dim);background:rgba(193,180,238,0.28);}
+
+  .btn{
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-transform:uppercase;letter-spacing:0.06em;
+    padding:12px 22px;min-height:46px;border-radius:3px;cursor:pointer;border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .btn-primary{background:var(--forest-deep);color:var(--paper);font-weight:600;}
+  .btn-primary:hover{background:var(--forest-mid);}
+  .btn-outline{border-color:var(--line-dark);background:none;color:var(--ink);}
+  .btn-outline:hover{border-color:var(--ink);}
+  .btn-danger{border-color:var(--red);background:none;color:var(--red);}
+  .form-actions{margin-top:22px;display:flex;gap:12px;align-items:center;}
+  .save-msg{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--green);}
+
+  /* filters + table */
+  .filter-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px;align-items:flex-end;justify-content:space-between;}
+  .filter-controls{display:flex;gap:12px;flex-wrap:wrap;}
+  .filter-controls select, .filter-controls input{
+    border:1px solid var(--line-dark);border-radius:2px;padding:9px 11px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:#fff;
+  }
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line-dark);}
+  thead th{
+    text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;
+    color:var(--soft);padding:12px 14px;border-bottom:1px solid var(--line-dark);background:var(--paper-2);
+  }
+  tbody td{padding:12px 14px;font-size:14px;border-bottom:1px solid var(--line-dark-2);font-family:'IBM Plex Mono',monospace;}
+  tbody tr:last-child td{border-bottom:none;}
+  .pill{padding:3px 9px;border-radius:20px;font-size:11px;text-transform:uppercase;letter-spacing:0.03em;font-family:'IBM Plex Mono',monospace;display:inline-block;}
+  .pill.aprovado{background:rgba(197,242,73,0.35);color:var(--green);}
+  .pill.reprovado{background:rgba(181,71,58,0.12);color:var(--red);}
+  .pill.pendente{background:rgba(193,180,238,0.35);color:var(--roxo-dim);}
+  .pill.producao{background:rgba(193,180,238,0.35);color:#51438D;}
+  .pill.concluido{background:rgba(197,242,73,0.35);color:#0A4A3C;}
+  .pill.qualidade{background:rgba(255,209,102,.3);color:#785719;}
+  .pill.cliente{background:rgba(197,242,73,.42);color:#0A4A3C;}
+  .empty-state{padding:50px 20px;text-align:center;color:var(--soft);font-family:'IBM Plex Mono',monospace;font-size:13px;}
+
+  /* diretoria */
+  .board-grid{display:grid;grid-template-columns:1.1fr 0.9fr;gap:24px;margin-bottom:24px;}
+  .board-card{background:var(--forest-deep);color:var(--paper);border-radius:3px;padding:26px;}
+  .board-card .cap{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(237,234,224,0.6);margin-bottom:16px;}
+  .roadmap{display:flex;flex-direction:column;gap:0;margin-top:8px;}
+  .rstep{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line-dark);}
+  .rstep:last-child{border-bottom:none;}
+  .rstep .rn{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--amber-dim);width:20px;flex-shrink:0;padding-top:2px;}
+  .rstep h4{font-size:13.5px;font-weight:600;text-transform:none;letter-spacing:0;font-family:'IBM Plex Sans',sans-serif;margin-bottom:3px;}
+  .rstep p{margin:0;font-size:12.5px;color:var(--soft);}
+  .rstep.done .rn{color:var(--green);}
+
+  /* charts */
+  .donut-wrap{display:flex;align-items:center;gap:28px;flex-wrap:wrap;}
+  .donut-svg{width:190px;height:190px;flex-shrink:0;}
+  .donut-legend{display:flex;flex-direction:column;gap:12px;flex:1;min-width:140px;}
+  .donut-legend .dl-row{display:flex;align-items:center;gap:10px;font-family:'IBM Plex Sans',sans-serif;font-size:14px;}
+  .donut-legend .dl-dot{width:11px;height:11px;border-radius:2px;flex-shrink:0;}
+  .donut-legend .dl-label{color:rgba(237,234,224,0.85);flex:1;}
+  .donut-legend .dl-val{font-family:'IBM Plex Mono',monospace;font-size:13.5px;color:#EDEAE0;font-weight:600;}
+  .bar-svg{width:100%;max-width:640px;height:auto;display:block;margin:0 auto;}
+
+  .reset-row{margin-top:36px;padding-top:20px;border-top:1px solid var(--line-dark);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  .reset-note{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--soft);}
+
+  .loading{padding:60px 0;text-align:center;font-family:'IBM Plex Mono',monospace;color:var(--soft);font-size:13px;}
+
+  /* produção */
+  .prod-banner{
+    background:var(--forest-deep);color:var(--paper);border-radius:3px;padding:20px 24px;
+    display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:32px;
+  }
+  .prod-banner .cap-light{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--amber);margin-bottom:6px;}
+  .prod-banner p{margin:0;font-size:13.5px;color:rgba(237,234,224,0.75);max-width:560px;}
+  .section-label{font-family:'IBM Plex Mono',monospace;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:var(--soft);margin-bottom:14px;}
+  .order-list{display:flex;flex-direction:column;gap:12px;}
+  .order-card{
+    background:#fff;border:1px solid var(--line-dark);border-radius:3px;padding:18px 20px;
+    display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;
+  }
+  .order-card .oc-info{display:flex;flex-direction:column;gap:4px;}
+  .order-card .oc-title{font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;}
+  .order-card .oc-meta{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--soft);}
+  .order-card .oc-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .order-card select{border:1px solid var(--line-dark);border-radius:2px;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+  .empty-note{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--soft);padding:16px 0;}
+  .machine-chips{display:flex;gap:8px;flex-wrap:wrap;}
+  .machine-chip{
+    display:flex;align-items:center;gap:8px;background:var(--paper-2);border-radius:20px;padding:6px 8px 6px 14px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;
+  }
+  .machine-chip button{border:none;background:none;color:var(--red);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;}
+  .live-badge{
+    display:inline-flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+    color:var(--soft);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:20px;
+  }
+  .live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.8s infinite;}
+  .sync-status{display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(255,255,255,.82);}
+  .sync-status .sync-dot{width:9px;height:9px;border-radius:50%;background:var(--verde-claro);flex:0 0 auto;}
+  .sync-status.offline .sync-dot{background:#FFD166;}
+  .role-badge{padding:3px 8px;border:1px solid rgba(255,255,255,.35);border-radius:20px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;}
+  .exec-dashboard{display:flex;flex-direction:column;gap:22px;}
+  .exec-hero{background:linear-gradient(125deg,#0A252A 0%,#123E43 72%,#1A4C4D 100%);color:#fff;border-radius:10px;padding:30px 32px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;position:relative;overflow:hidden;}
+  .exec-hero::after{content:'';position:absolute;width:280px;height:280px;border:55px solid rgba(197,242,73,.09);border-radius:50%;right:-85px;top:-115px;}
+  .exec-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.13em;color:var(--verde-claro);font-weight:600;margin-bottom:8px;}
+  .exec-hero h2{font-size:clamp(26px,3vw,42px);line-height:1.05;max-width:650px;}
+  .exec-hero p{margin:10px 0 0;color:rgba(255,255,255,.72);font-size:14px;max-width:650px;}
+  .exec-update{position:relative;z-index:1;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(255,255,255,.65);white-space:nowrap;}
+  .exec-update strong{display:block;color:#fff;font-size:14px;margin-top:4px;}
+  .exec-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .exec-metric{background:#fff;border:1px solid var(--line-dark);border-radius:8px;padding:22px 24px;position:relative;overflow:hidden;box-shadow:0 5px 18px rgba(10,37,42,.06);}
+  .exec-metric::before{content:'';position:absolute;inset:0 auto 0 0;width:5px;background:var(--metric-color,var(--verde-claro));}
+  .exec-metric .metric-label{font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.07em;color:var(--soft);font-size:11px;font-weight:600;}
+  .exec-metric .metric-value{font-family:'Oswald',sans-serif;font-size:clamp(32px,3.2vw,50px);line-height:1.1;margin:9px 0 4px;color:var(--ink);}
+  .exec-metric .metric-note{font-size:12px;color:var(--soft);}
+  .exec-summary-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;}
+  .exec-panel{background:#fff;border:1px solid var(--line-dark);border-radius:8px;padding:24px;box-shadow:0 5px 18px rgba(10,37,42,.05);}
+  .exec-panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px;}
+  .exec-panel-title{font-family:'Oswald',sans-serif;font-size:18px;text-transform:uppercase;}
+  .exec-panel-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--soft);}
+  .status-track{height:18px;background:var(--paper-2);border-radius:20px;overflow:hidden;display:flex;margin:18px 0 16px;}
+  .status-track span{height:100%;transition:width .35s ease;}
+  .status-track .active{background:var(--roxo-dim);}
+  .status-track .quality{background:#E3B341;}
+  .status-track .done{background:var(--verde-claro);}
+  .status-legend{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .status-legend-row{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--soft);}
+  .status-legend-row b{color:var(--ink);margin-left:auto;}
+  .legend-dot{width:10px;height:10px;border-radius:50%;background:var(--dot);}
+  .finance-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-dark);border:1px solid var(--line-dark);}
+  .finance-cell{background:#fff;padding:16px;}
+  .finance-cell.full{grid-column:1/-1;background:var(--forest-deep);color:#fff;}
+  .finance-label{font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--soft);}
+  .finance-cell.full .finance-label{color:rgba(255,255,255,.6);}
+  .finance-value{font-family:'Oswald',sans-serif;font-size:24px;margin-top:5px;}
+  .finance-cell.full .finance-value{font-size:30px;color:var(--verde-claro);}
+  .exec-lists-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:start;}
+  .director-order-list{display:flex;flex-direction:column;gap:10px;}
+  .director-order-card{border:1px solid var(--line-dark);border-radius:7px;padding:17px;background:#fff;}
+  .director-order-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:11px;}
+  .director-order-op{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--soft);font-weight:600;}
+  .director-order-title{font-family:'Oswald',sans-serif;text-transform:uppercase;font-size:16px;line-height:1.25;margin-bottom:12px;}
+  .director-order-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 16px;padding-top:12px;border-top:1px solid var(--line-dark-2);}
+  .director-order-meta span{font-size:11px;color:var(--soft);display:block;}
+  .director-order-meta b{font-size:12px;color:var(--ink);font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .director-order-value{grid-column:1/-1;margin-top:2px;padding-top:10px;border-top:1px dashed var(--line-dark);display:flex!important;justify-content:space-between;align-items:center;}
+  .director-order-value strong{font-family:'Oswald',sans-serif;font-size:22px;color:var(--ink);}
+  .workflow{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:14px 0 2px;}
+  .workflow-step{position:relative;text-align:center;padding-top:16px;font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.03em;color:#819094;}
+  .workflow-step::before{content:'';position:absolute;top:4px;left:50%;width:10px;height:10px;border-radius:50%;background:#D5DDDC;transform:translateX(-50%);z-index:2;}
+  .workflow-step::after{content:'';position:absolute;top:8px;right:50%;width:100%;height:2px;background:#D5DDDC;z-index:1;}
+  .workflow-step:first-child::after{display:none;}
+  .workflow-step.done,.workflow-step.current{color:var(--ink);font-weight:600;}
+  .workflow-step.done::before{background:var(--verde-claro);}
+  .workflow-step.current::before{background:var(--roxo-dim);box-shadow:0 0 0 4px rgba(122,109,174,.16);}
+  .workflow-step.done::after,.workflow-step.current::after{background:var(--verde-claro);}
+  .quality-queue{display:flex;flex-direction:column;gap:14px;}
+  .quality-card{background:#fff;border:1px solid var(--line-dark);border-left:5px solid #E3B341;border-radius:7px;padding:20px;display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;}
+  .quality-card h4{font-size:17px;margin-bottom:5px;}
+  .quality-card .q-meta{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--soft);}
+  .quality-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;}
+  .btn-success{background:var(--verde-claro);border-color:var(--verde-claro);color:var(--forest-deep);font-weight:700;}
+  .excel-connector{background:#fff;border:1px solid var(--line-dark);border-left:5px solid #217346;border-radius:7px;padding:18px 20px;margin-bottom:22px;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;}
+  .excel-connector h3{font-family:'IBM Plex Sans',sans-serif;text-transform:none;font-size:16px;margin-bottom:4px;}
+  .excel-connector p{margin:0;color:var(--soft);font-size:13px;}
+  .excel-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}
+  .excel-status{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--soft);width:100%;text-align:right;}
+  .excel-status.connected{color:#146C43;font-weight:600;}
+  .order-import-controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap;}
+  .order-import-controls select,.order-search{border:1px solid var(--line-dark);border-radius:3px;padding:10px 11px;background:#fff;color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12px;min-height:42px;}
+  .order-summary{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 16px;}
+  .order-summary-text{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--soft);}
+  .order-details{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px;}
+  .order-detail{font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--paper-2);color:var(--soft);padding:3px 7px;border-radius:12px;}
+  .visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+  :focus-visible{outline:3px solid var(--focus);outline-offset:3px;}
+  @keyframes pulse{0%{opacity:1;}50%{opacity:0.35;}100%{opacity:1;}}
+  @media (max-width:880px){.form-grid{grid-template-columns:1fr;} .board-grid{grid-template-columns:1fr;}}
+  @media (max-width:1200px){.exec-kpis{grid-template-columns:repeat(2,1fr);}.exec-lists-grid{grid-template-columns:1fr 1fr;}}
+  @media (max-width:900px){.exec-summary-grid,.exec-lists-grid{grid-template-columns:1fr;}.quality-card{grid-template-columns:1fr;}.quality-actions{justify-content:flex-start;}}
+
+  /* ---------- ACESSO LOCAL PARA HOSPEDAGEM ESTATICA ---------- */
+  .login-screen{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:#F2F2F2;font-family:'Segoe UI', 'IBM Plex Sans', sans-serif;padding:20px;
+  }
+  .login-card{
+    background:#fff;width:100%;max-width:400px;border:1px solid #d6d6d6;
+    box-shadow:0 2px 6px rgba(0,0,0,0.13);padding:44px 44px 36px;
+  }
+  .login-ms-logo{display:flex;gap:2px;width:21px;height:21px;margin-bottom:18px;flex-wrap:wrap;}
+  .login-ms-logo span{width:9.5px;height:9.5px;display:block;}
+  .login-ms-logo span:nth-child(1){background:#F25022;}
+  .login-ms-logo span:nth-child(2){background:#7FBA00;}
+  .login-ms-logo span:nth-child(3){background:#00A4EF;}
+  .login-ms-logo span:nth-child(4){background:#FFB900;}
+  .login-card h2{
+    font-family:'Segoe UI','IBM Plex Sans',sans-serif;text-transform:none;letter-spacing:0;
+    font-size:23px;font-weight:600;color:#1b1b1b;margin-bottom:6px;
+  }
+  .login-card p.sub{color:#1b1b1b;font-size:14.5px;margin:0 0 22px;}
+  .login-card label{display:block;font-size:13px;color:#1b1b1b;margin-bottom:6px;}
+  .login-card input,.login-card select{
+    width:100%;padding:9px 8px;border:1px solid #666;font-size:14.5px;margin-bottom:4px;
+    font-family:'Segoe UI','IBM Plex Sans',sans-serif;
+  }
+  .login-card input:focus,.login-card select:focus{outline:none;border-color:#0067b8;border-width:2px;padding:8px 7px;}
+  .login-hint{font-size:12.5px;color:#666;margin-bottom:22px;}
+  .login-error{font-size:12.5px;color:#a4262c;margin-bottom:14px;display:none;}
+  .login-actions{display:flex;justify-content:flex-end;margin-top:26px;}
+  .login-next-btn{
+    background:#0067b8;color:#fff;border:none;font-size:14.5px;padding:9px 26px;cursor:pointer;
+    font-family:'Segoe UI','IBM Plex Sans',sans-serif;
+  }
+  .login-next-btn:hover{background:#005ba1;}
+  .login-next-btn:disabled{background:#c8c8c8;cursor:default;}
+  .login-footer-note{
+    max-width:400px;margin:18px auto 0;text-align:center;font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;color:#8a8a8a;line-height:1.5;
+  }
+  .login-spinner{
+    display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px 0 6px;
+  }
+  .spin{
+    width:34px;height:34px;border:3px solid #d9d9d9;border-top-color:#0067b8;border-radius:50%;
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .login-spinner span{font-size:13px;color:#555;font-family:'Segoe UI','IBM Plex Sans',sans-serif;}
+  .user-chip{
+    display:flex;align-items:center;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(237,234,224,0.85);
+  }
+  .user-chip .avatar{
+    width:26px;height:26px;border-radius:50%;background:var(--amber);color:var(--forest-deep);
+    display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:12px;
+  }
+  .user-chip button{
+    background:none;border:1px solid rgba(237,234,224,0.3);color:rgba(237,234,224,0.8);
+    font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 10px;border-radius:2px;cursor:pointer;
+  }
+  .user-chip button:hover{border-color:rgba(237,234,224,0.7);color:#fff;}
+
+  /* ================= RESPONSIVIDADE GERAL ================= */
+
+  /* celulares pequenos */
+  @media (max-width:480px){
+    .app{padding:0 16px 50px;}
+    .topbar-inner{padding:0 16px;align-items:flex-start;}
+    .topbar-inner>div:last-child{width:100%;justify-content:space-between;gap:10px!important;}
+    .brand{font-size:15px;}
+    .clock{font-size:11px;}
+    .tab-btn{padding:10px 12px;font-size:11.5px;}
+    .panel-box{padding:20px 16px;}
+    .form-grid{gap:14px;}
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+    .kpi-row.three{grid-template-columns:1fr;}
+    .kpi{padding:14px 14px;}
+    .kpi .val{font-size:22px;}
+    .order-card{flex-direction:column;align-items:flex-start;}
+    .order-card .oc-actions{width:100%;flex-direction:column;align-items:stretch;}
+    .order-card select,.order-card .btn{width:100%;}
+    .prod-banner{flex-direction:column;align-items:flex-start;}
+    table{font-size:12px;}
+    thead th, tbody td{padding:8px 8px;}
+    .donut-wrap{flex-direction:column;align-items:flex-start;}
+    .form-actions,.filter-controls,.filter-row{flex-direction:column;align-items:stretch;width:100%;}
+    .filter-controls select,.filter-controls input,.filter-row .btn{width:100%;min-height:46px;}
+    .login-card{padding:30px 22px;}
+    .excel-actions,.excel-actions .btn{width:100%;}
+    .excel-status{text-align:left;}
+    .exec-hero{padding:24px 20px;align-items:flex-start;flex-direction:column;}
+    .exec-update{text-align:left;}
+    .exec-kpis{grid-template-columns:1fr;}
+    .status-legend{grid-template-columns:1fr;}
+    .exec-panel{padding:19px 16px;}
+  }
+
+  /* tablets */
+  @media (min-width:481px) and (max-width:1024px){
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+  }
+
+  /* telas grandes / TVs (ex.: 1920x1080 usado como dashboard na diretoria) */
+  @media (min-width:1600px){
+    .app{max-width:1620px;}
+    .topbar-inner{max-width:1620px;}
+    body{font-size:21px;}
+    .brand{font-size:20px;}
+    .brand small{font-size:13px;}
+    .clock{font-size:15px;}
+    .tab-btn{font-size:15px;padding:16px 24px;}
+    .kpi{padding:26px 28px;}
+    .kpi .lbl{font-size:13.5px;}
+    .kpi .val{font-size:40px;}
+    .board-card{padding:34px;}
+    .board-card .cap{font-size:13px;}
+    .donut-svg{width:250px;height:250px;}
+    .donut-legend .dl-row{font-size:16px;}
+    .donut-legend .dl-val{font-size:15px;}
+    .bar-svg{max-width:820px;}
+    .order-card{padding:22px 26px;}
+    .order-card .oc-title{font-size:18px;}
+    .order-card .oc-meta{font-size:16px;}
+    .live-badge{font-size:13.5px;}
+    .exec-dashboard{gap:28px;}
+    .exec-hero{padding:42px;}
+    .exec-metric{padding:30px;}
+    .exec-panel{padding:30px;}
+    .section-label{font-size:13.5px;}
+    table{font-size:17px;}
+    thead th{font-size:14px;}
+    tbody td{font-size:16px;}
+  }
+  @media (min-width:2200px){
+    .app{max-width:2000px;}
+    .topbar-inner{max-width:2000px;}
+    body{font-size:25px;}
+    .kpi .val{font-size:48px;}
+    .donut-svg{width:290px;height:290px;}
+  }
+
+  /* telas bem baixas (tablets em modo paisagem) */
+  @media (max-height:500px) and (min-width:700px){
+    .topbar{padding:12px 0;}
+    section{padding:0;}
+  }
+  @media (pointer:coarse){
+    button,select,input{min-height:48px;}
+    .tab-btn{min-height:52px;}
+  }
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;}}
+</style>
+</head>
+<body>
+
+<!-- O acesso e validado no servidor pelo Cloudflare Access e pelo cadastro de perfil no D1. -->
+<div class="login-screen" id="loginScreen">
+  <div style="width:100%;max-width:400px;margin:0 auto;">
+    <div class="login-card" id="loginCardEmail" style="display:none;">
+      <h2>Acesso não liberado</h2>
+      <p class="sub">Seu login corporativo foi reconhecido, mas não existe um perfil ativo para este portal.</p>
+      <div class="login-error" id="loginError" style="display:block;">Solicite o cadastro à equipe de TI.</div>
+    </div>
+    <div class="login-card" id="loginCardSpinner">
+      <div class="login-spinner">
+        <div class="spin"></div>
+        <span id="loginSpinnerText">Validando acesso corporativo...</span>
+      </div>
+    </div>
+    <div class="login-footer-note">Acesso restrito e protegido pelo Cloudflare Access.</div>
+  </div>
+</div>
+
+<div id="mainApp" style="display:none;">
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand"><span class="mark"></span>Forest Paper<br><small>Qualidade &amp; Produção · uso interno</small></div>
+    <div style="display:flex;align-items:center;gap:22px;">
+      <div class="clock" id="clockBox">—</div>
+      <div class="user-chip" id="userChip"></div>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="apontamento">Apontamento (Qualidade)</button>
+    <button class="tab-btn" data-tab="painel">Painel de Qualidade</button>
+    <button class="tab-btn" data-tab="qualidade">Cargas para liberar</button>
+    <button class="tab-btn" data-tab="producao">Produção</button>
+    <button class="tab-btn" data-tab="diretoria">Diretoria / Dashboard</button>
+  </div>
+
+  <div id="loadingBox" class="loading">Carregando registros...</div>
+
+  <div id="appBody" style="display:none;">
+
+    <!-- KPIs (shown on painel + diretoria) -->
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <!-- TAB: APONTAMENTO -->
+    <div class="tab-panel active" id="tab-apontamento">
+      <div class="excel-connector">
+        <div>
+          <h3>Planilha oficial da Qualidade</h3>
+          <p>Conecte a base usada pelo setor. Cada novo apontamento será incluído em Diário, Klabin ou Tubetes conforme o registro.</p>
+        </div>
+        <div class="excel-actions">
+          <button type="button" class="btn btn-outline" id="connectQualityExcelBtn">Conectar planilha</button>
+          <button type="button" class="btn btn-success" id="downloadQualityExcelBtn" disabled>Baixar planilha atualizada</button>
+          <input type="file" id="qualityExcelInput" accept=".xlsx,.xls" hidden>
+          <div class="excel-status" id="qualityExcelStatus" role="status">Nenhuma planilha conectada.</div>
+        </div>
+      </div>
+      <div class="panel-box">
+        <h3>Registrar produto em produção</h3>
+        <form id="apontamentoForm">
+          <div class="form-grid">
+            <div class="field">
+              <label for="cliente">Cliente</label>
+              <input id="cliente" type="text" placeholder="Nome do cliente">
+            </div>
+            <div class="field">
+              <label for="numeroOP">Nº OP</label>
+              <input id="numeroOP" type="text" placeholder="Ex.: 111167">
+            </div>
+            <div class="field">
+              <label for="contagemOP">Contagem de OP</label>
+              <input id="contagemOP" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 1">
+            </div>
+            <div class="field">
+              <label for="tipoAmostragem">Tipo de amostragem</label>
+              <select id="tipoAmostragem">
+                <option value="Geral">Geral (OP)</option>
+                <option value="Tubetes">Tubetes</option>
+                <option value="Laminacao">Laminação / Embalagem</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="produto">Produto</label>
+              <input id="produto" type="text" placeholder="Ex.: Papel Kraft 80g/m²" required>
+            </div>
+            <div class="field">
+              <label for="maquina">Máquina / linha</label>
+              <select id="maquina" required>
+                <option value="">Selecione</option>
+                <option>Máquina 1</option>
+                <option>Máquina 2</option>
+                <option>Acabamento</option>
+                <option>Rebobinadeira</option>
+                <option>Corte e embalagem</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="lote">Lote</label>
+              <input id="lote" type="text" placeholder="Ex.: L-0637-B" required>
+            </div>
+            <div class="field">
+              <label for="numeroPallet">Número do pallet</label>
+              <input id="numeroPallet" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 12">
+            </div>
+            <div class="field">
+              <label for="inicioMeioFim">Início, meio ou fim</label>
+              <select id="inicioMeioFim">
+                <option value="">Selecione</option>
+                <option>Início</option>
+                <option>Meio</option>
+                <option>Fim</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="turno">Turno</label>
+              <select id="turno" required>
+                <option value="1º Turno">1º Turno</option>
+                <option value="2º Turno">2º Turno</option>
+                <option value="3º Turno">3º Turno</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="inspetor">Inspetor responsável</label>
+              <input id="inspetor" type="text" placeholder="Nome do inspetor" required>
+            </div>
+
+            <div class="section-divider"><h4>Quantidades e liberação</h4></div>
+            <div class="field">
+              <label for="qtdPedido">Quantidade do pedido</label>
+              <input id="qtdPedido" type="text" inputmode="decimal" data-numeric="true" placeholder="0">
+            </div>
+            <div class="field">
+              <label for="qtdAvaliar">Quantidade a ser avaliada</label>
+              <input id="qtdAvaliar" type="text" inputmode="decimal" data-numeric="true" placeholder="0">
+            </div>
+            <div class="field">
+              <label for="qtdAvaliada">Quantidade avaliada do pedido</label>
+              <input id="qtdAvaliada" type="text" inputmode="decimal" data-numeric="true" placeholder="0">
+            </div>
+            <div class="field">
+              <label for="liberado">Liberado</label>
+              <select id="liberado">
+                <option value="Pendente">Pendente</option>
+                <option value="Sim">Sim</option>
+                <option value="Não">Não</option>
+              </select>
+            </div>
+
+            <div class="section-divider"><h4>Medidas dimensionais</h4></div>
+            <div class="field">
+              <label>Formato (Largura × Altura)</label>
+              <div class="unit-group">
+                <input id="formatoLargura" type="text" inputmode="decimal" data-numeric="true" placeholder="Largura">
+                <span class="dim-x">×</span>
+                <input id="formatoAltura" type="text" inputmode="decimal" data-numeric="true" placeholder="Altura">
+                <span class="unit-suffix">mm</span>
+              </div>
+              <button type="button" class="spec-toggle" data-spec-toggle="formato">+ definir faixa aceitável</button>
+              <div class="spec-row" data-spec-row="formato">
+                <input type="text" inputmode="decimal" data-numeric="true" data-spec="formatoLargura-min" placeholder="Largura mín.">
+                <input type="text" inputmode="decimal" data-numeric="true" data-spec="formatoLargura-max" placeholder="Largura máx.">
+                <input type="text" inputmode="decimal" data-numeric="true" data-spec="formatoAltura-min" placeholder="Altura mín.">
+                <input type="text" inputmode="decimal" data-numeric="true" data-spec="formatoAltura-max" placeholder="Altura máx.">
+              </div>
+              <div class="deviation-msg" id="dev-formato"></div>
+            </div>
+            <div class="field">
+              <label for="diametro">Diâmetro</label>
+              <div class="unit-group">
+                <input id="diametro" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 121,6">
+                <span class="unit-suffix">mm</span>
+              </div>
+              <button type="button" class="spec-toggle" data-spec-toggle="diametro">+ definir faixa aceitável</button>
+              <div class="spec-row" data-spec-row="diametro">
+                <input type="text" inputmode="decimal" data-numeric="true" data-spec="diametro-min" placeholder="Mínimo">
+                <input type="text" inputmode="decimal" data-numeric="true" data-spec="diametro-max" placeholder="Máximo">
+              </div>
+              <div class="deviation-msg" id="dev-diametro"></div>
+            </div>
+            <div class="field">
+              <label for="gramatura">Gramatura</label>
+              <div class="unit-group">
+                <input id="gramatura" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 80">
+                <span class="unit-suffix">g/m²</span>
+              </div>
+              <button type="button" class="spec-toggle" data-spec-toggle="gramatura">+ definir faixa aceitável</button>
+              <div class="spec-row" data-spec-row="gramatura">
+                <input type="text" inputmode="decimal" data-numeric="true" data-spec="gramatura-min" placeholder="Mínimo">
+                <input type="text" inputmode="decimal" data-numeric="true" data-spec="gramatura-max" placeholder="Máximo">
+              </div>
+              <div class="deviation-msg" id="dev-gramatura"></div>
+            </div>
+            <div class="field">
+              <label for="espessura">Espessura</label>
+              <div class="unit-group">
+                <input id="espessura" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 0,12">
+                <span class="unit-suffix">mm</span>
+              </div>
+            </div>
+            <div class="field">
+              <label for="brilho">Brilho</label>
+              <div class="unit-group">
+                <input id="brilho" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 45">
+                <span class="unit-suffix">GU</span>
+              </div>
+            </div>
+
+            <!-- TUBETES -->
+            <div class="extra-section" data-extra="Tubetes">
+              <div class="section-divider"><h4>Testes específicos — Tubetes</h4></div>
+              <div class="field">
+                <label for="polegadas">Polegadas</label>
+                <input id="polegadas" type="text" placeholder='Ex.: 4"'>
+              </div>
+              <div class="field">
+                <label for="umidade">Umidade</label>
+                <div class="unit-group">
+                  <input id="umidade" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 7">
+                  <span class="unit-suffix">%</span>
+                </div>
+                <div class="spec-row open">
+                  <input type="text" data-numeric="true" data-spec="umidade-min" value="6" placeholder="Mín.">
+                  <input type="text" data-numeric="true" data-spec="umidade-max" value="8" placeholder="Máx.">
+                </div>
+                <div class="deviation-msg" id="dev-umidade"></div>
+              </div>
+              <div class="field">
+                <label for="espParede">Espessura da parede</label>
+                <div class="unit-group">
+                  <input id="espParede" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 10">
+                  <span class="unit-suffix">mm</span>
+                </div>
+                <div class="spec-row open">
+                  <input type="text" data-numeric="true" data-spec="espParede-min" value="9,8" placeholder="Mín.">
+                  <input type="text" data-numeric="true" data-spec="espParede-max" value="10,2" placeholder="Máx.">
+                </div>
+                <div class="deviation-msg" id="dev-espParede"></div>
+              </div>
+              <div class="field">
+                <label for="diamExterno">Diâmetro externo</label>
+                <div class="unit-group">
+                  <input id="diamExterno" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 121,6">
+                  <span class="unit-suffix">mm</span>
+                </div>
+                <div class="spec-row open">
+                  <input type="text" data-numeric="true" data-spec="diamExterno-min" value="121,4" placeholder="Mín.">
+                  <input type="text" data-numeric="true" data-spec="diamExterno-max" value="121,8" placeholder="Máx.">
+                </div>
+                <div class="deviation-msg" id="dev-diamExterno"></div>
+              </div>
+              <div class="field">
+                <label for="diamInterno">Diâmetro interno</label>
+                <div class="unit-group">
+                  <input id="diamInterno" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 101,6">
+                  <span class="unit-suffix">mm</span>
+                </div>
+                <div class="spec-row open">
+                  <input type="text" data-numeric="true" data-spec="diamInterno-min" value="101,4" placeholder="Mín.">
+                  <input type="text" data-numeric="true" data-spec="diamInterno-max" value="101,8" placeholder="Máx.">
+                </div>
+                <div class="deviation-msg" id="dev-diamInterno"></div>
+              </div>
+              <div class="field">
+                <label for="compressao">Compressão</label>
+                <div class="unit-group">
+                  <input id="compressao" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 125">
+                  <span class="unit-suffix">kgf</span>
+                </div>
+                <div class="spec-row open">
+                  <input type="text" data-numeric="true" data-spec="compressao-min" value="120" placeholder="Mín.">
+                  <input type="text" data-numeric="true" data-spec="compressao-max" placeholder="Máx. (opcional)">
+                </div>
+                <div class="deviation-msg" id="dev-compressao"></div>
+              </div>
+              <div class="field">
+                <label for="comprimento">Comprimento</label>
+                <div class="unit-group">
+                  <input id="comprimento" type="text" inputmode="decimal" data-numeric="true" placeholder="Ex.: 833">
+                  <span class="unit-suffix">mm</span>
+                </div>
+                <div class="spec-row open">
+                  <input type="text" data-numeric="true" data-spec="comprimento-min" value="830" placeholder="Mín.">
+                  <input type="text" data-numeric="true" data-spec="comprimento-max" value="836" placeholder="Máx.">
+                </div>
+                <div class="deviation-msg" id="dev-comprimento"></div>
+              </div>
+            </div>
+
+            <!-- LAMINAÇÃO / EMBALAGEM -->
+            <div class="extra-section" data-extra="Laminacao">
+              <div class="section-divider"><h4>Testes específicos — Laminação / Embalagem</h4></div>
+              <div class="field">
+                <label for="direcaoFilme">Direção do filme</label>
+                <input id="direcaoFilme" type="text" placeholder="Ex.: Longitudinal">
+              </div>
+              <div class="field">
+                <label for="cobb">Cobb</label>
+                <input id="cobb" type="text" inputmode="decimal" data-numeric="true" placeholder="Valor Cobb">
+              </div>
+              <div class="field">
+                <label for="unidadeCobb">Unidade (Cobb)</label>
+                <input id="unidadeCobb" type="text" placeholder="Ex.: g/m²">
+              </div>
+              <div class="field">
+                <label for="colagem">Colagem (Laminado)</label>
+                <input id="colagem" type="text" placeholder="Descrição da colagem">
+              </div>
+              <div class="field">
+                <label for="embalagem">Embalagem</label>
+                <input id="embalagem" type="text" placeholder="Batoque, disco e capa...">
+              </div>
+              <div class="field">
+                <label for="contOp">Cont. OP</label>
+                <input id="contOp" type="text" inputmode="decimal" data-numeric="true" placeholder="0">
+              </div>
+              <div class="field">
+                <label for="contCondicao">Cont. Condição</label>
+                <input id="contCondicao" type="text" placeholder="Condição encontrada">
+              </div>
+            </div>
+
+            <div class="section-divider"><h4>Resultado</h4></div>
+            <div class="field full">
+              <div class="alerts-box" id="alertsBox">
+                <div class="at">⚠ Desvios detectados automaticamente</div>
+                <ul id="alertsList"></ul>
+              </div>
+            </div>
+            <div class="field full">
+              <label for="desvioEncontrado">Desvio encontrado</label>
+              <input id="desvioEncontrado" type="text" placeholder="Descreva o desvio, se houver (ou deixe em branco)">
+            </div>
+            <div class="field">
+              <label>Status da amostragem</label>
+              <div style="display:flex;gap:10px;">
+                <div class="status-choice aprovado" style="flex:1;">
+                  <label><input type="radio" name="status" value="Aprovado" checked><span>Aprovado</span></label>
+                </div>
+                <div class="status-choice pendente" style="flex:1;">
+                  <label><input type="radio" name="status" value="Pendente"><span>Pendente</span></label>
+                </div>
+                <div class="status-choice reprovado" style="flex:1;">
+                  <label><input type="radio" name="status" value="Reprovado"><span>Reprovado</span></label>
+                </div>
+              </div>
+            </div>
+            <div class="field full">
+              <label for="observacoes">Observações</label>
+              <textarea id="observacoes" placeholder="Detalhes da inspeção, medidas tomadas..."></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Registrar apontamento</button>
+            <span class="save-msg" id="saveMsg"></span>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB: PAINEL -->
+    <div class="tab-panel" id="tab-painel">
+      <div class="filter-row">
+        <div class="filter-controls">
+          <select id="filterTurno">
+            <option value="">Todos os turnos</option>
+            <option value="1º Turno">1º Turno</option>
+            <option value="2º Turno">2º Turno</option>
+            <option value="3º Turno">3º Turno</option>
+          </select>
+          <select id="filterStatus">
+            <option value="">Todos os status</option>
+            <option value="Aprovado">Aprovado</option>
+            <option value="Pendente">Pendente</option>
+            <option value="Reprovado">Reprovado</option>
+          </select>
+          <input id="filterProduto" type="text" placeholder="Buscar produto ou lote...">
+        </div>
+        <button class="btn btn-outline" id="exportBtn">⭳ Exportar para Excel (.xlsx)</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Horário</th><th>Cliente</th><th>Nº OP</th><th>Produto</th><th>Lote</th><th>Turno</th>
+              <th>Liberado</th><th>Status</th><th>Desvio</th><th>Inspetor</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="reset-row">
+        <span class="reset-note">Os dados ficam salvos e visíveis para todo o time que acessar esta ferramenta.</span>
+        <button class="btn btn-danger" id="resetBtn">Limpar todos os registros</button>
+      </div>
+    </div>
+
+    <!-- TAB: FILA DA QUALIDADE -->
+    <div class="tab-panel" id="tab-qualidade">
+      <div class="prod-banner">
+        <div>
+          <div class="cap-light">Etapa 2 de 3 · Qualidade</div>
+          <p>As cargas concluídas pela Produção chegam aqui automaticamente. Após a inspeção, libere para o cliente ou devolva para correção.</p>
+        </div>
+        <div class="live-badge" style="color:rgba(255,255,255,.82);margin:0;"><span class="live-dot" style="background:var(--verde-claro);"></span>Fila sincronizada</div>
+      </div>
+      <div class="section-label">Aguardando decisão da Qualidade</div>
+      <div id="filaQualidade" class="quality-queue"></div>
+    </div>
+
+    <!-- TAB: PRODUÇÃO -->
+    <div class="tab-panel" id="tab-producao">
+      <div class="excel-connector">
+        <div>
+          <h3>Pedidos de venda via Excel</h3>
+          <p>Selecione a planilha exportada do ERP para carregar os pedidos liberados para produ&ccedil;&atilde;o.</p>
+        </div>
+        <div class="excel-actions">
+          <div class="order-import-controls">
+            <select id="ordersImportMode" title="Filtro aplicado durante a importacao">
+              <option value="pending120">Pendentes dos ultimos 120 dias</option>
+              <option value="recent120">Todos dos ultimos 120 dias</option>
+              <option value="recent365">Todos dos ultimos 365 dias</option>
+            </select>
+            <button type="button" class="btn btn-outline" id="importOrdersExcelBtn">Importar pedidos</button>
+            <a class="btn btn-outline" id="officialWorkbookLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Abrir planilha oficial</a>
+          </div>
+          <input type="file" id="ordersExcelInput" accept=".xlsx,.xls,.csv" hidden>
+          <div class="excel-status connected" id="ordersExcelStatus" role="status">Sincronização automática configurada no Cloudflare. A importação manual permanece como contingência.</div>
+        </div>
+      </div>
+      <div class="prod-banner">
+        <div>
+          <div class="cap-light">Ordens de produção · Excel / Cloudflare D1</div>
+          <p>O Cloudflare consulta a planilha corporativa a cada três horas. Use a importação manual apenas em contingência.</p>
+        </div>
+        <div>
+          <div class="sync-status offline" id="protheusSyncStatus" role="status"><span class="sync-dot"></span><span>Verificando conexão...</span></div>
+          <button class="btn btn-outline" id="syncOrdersBtn" style="margin-top:10px;">Atualizar agora</button>
+        </div>
+      </div>
+
+      <div class="order-summary">
+        <div class="section-label" style="margin:0;">Aguardando início</div>
+        <input id="orderSearch" class="order-search" type="search" placeholder="Buscar pedido, cliente ou produto...">
+        <div id="orderSummaryText" class="order-summary-text"></div>
+      </div>
+      <div id="pedidosAguardando" class="order-list"></div>
+
+      <div class="section-label" style="margin-top:34px;">Em produção agora</div>
+      <div id="pedidosEmProducao" class="order-list"></div>
+
+      <div class="panel-box" style="margin-top:34px;">
+        <h3 style="font-size:14px;margin-bottom:14px;">Máquinas / cantoneiras cadastradas</h3>
+        <div id="machineChips" class="machine-chips"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;">
+          <input id="newMachineInput" type="text" placeholder="Nome da máquina ou cantoneira" style="flex:1;border:1px solid var(--line-dark);border-radius:2px;padding:9px 12px;font-family:'IBM Plex Sans',sans-serif;font-size:14px;">
+          <button class="btn btn-outline" id="addMachineBtn">+ Adicionar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: DIRETORIA -->
+    <div class="tab-panel" id="tab-diretoria">
+      <div class="exec-dashboard">
+        <header class="exec-hero">
+          <div>
+            <div class="exec-eyebrow">Visão executiva · Fluxo completo</div>
+            <h2>Produção → Qualidade → Cliente</h2>
+            <p>Acompanhamento de cada carga desde o início da fabricação até a liberação final, com valor financeiro consolidado.</p>
+          </div>
+          <div class="exec-update"><span>ATUALIZAÇÃO AUTOMÁTICA</span><strong id="dashboardUpdatedAt">—</strong></div>
+        </header>
+
+        <div class="exec-kpis" id="kpiRowProducao"></div>
+
+        <div class="exec-summary-grid">
+          <article class="exec-panel">
+            <div class="exec-panel-head">
+              <div><div class="exec-panel-title">Fluxo das cargas</div><div class="exec-panel-sub">Distribuição das OPs iniciadas</div></div>
+            </div>
+            <div id="dashStatusResumo"></div>
+          </article>
+          <article class="exec-panel">
+            <div class="exec-panel-head">
+              <div><div class="exec-panel-title">Resumo financeiro</div><div class="exec-panel-sub">Valores das cargas visíveis no painel</div></div>
+            </div>
+            <div id="dashFinanceiro"></div>
+          </article>
+        </div>
+
+        <div class="exec-lists-grid">
+          <section class="exec-panel">
+            <div class="exec-panel-head"><div><div class="exec-panel-title">Em produção</div><div class="exec-panel-sub" id="dashEmProducaoSub">—</div></div><span class="pill producao">Ativas</span></div>
+            <div id="dashEmProducao" class="director-order-list"></div>
+          </section>
+          <section class="exec-panel">
+            <div class="exec-panel-head"><div><div class="exec-panel-title">Na Qualidade</div><div class="exec-panel-sub" id="dashQualidadeSub">—</div></div><span class="pill qualidade">Inspeção</span></div>
+            <div id="dashQualidade" class="director-order-list"></div>
+          </section>
+          <section class="exec-panel">
+            <div class="exec-panel-head"><div><div class="exec-panel-title">Liberadas ao cliente</div><div class="exec-panel-sub" id="dashClienteSub">—</div></div><span class="pill cliente">Liberadas</span></div>
+            <div id="dashCliente" class="director-order-list"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div><!-- /mainApp -->
+
+<script>
+(function(){
+  /* API e arquivos estaticos sao publicados no mesmo Cloudflare Worker. */
+  const APP_CONFIG = Object.assign({
+    apiBaseUrl: '/api',
+    protheusApiUrl: '/api/orders',
+    sharepointWorkbookUrl: '',
+    syncIntervalMs: 15000
+  }, window.FOREST_PAPER_CONFIG || {});
+
+  const officialWorkbookLink = document.getElementById('officialWorkbookLink');
+  if(APP_CONFIG.sharepointWorkbookUrl){
+    officialWorkbookLink.href = APP_CONFIG.sharepointWorkbookUrl;
+    officialWorkbookLink.hidden = false;
+  }
+
+  const storageAdapter = {
+    async get(key){
+      const response = await fetch(`${APP_CONFIG.apiBaseUrl}/state/${encodeURIComponent(key)}`, {
+        credentials:'same-origin', headers:{'Accept':'application/json'}
+      });
+      if(!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+    async set(key, value){
+      const response = await fetch(`${APP_CONFIG.apiBaseUrl}/state/${encodeURIComponent(key)}`, {
+        method:'PUT', credentials:'same-origin',
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify({value})
+      });
+      if(!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    }
+  };
+
+  // ----- IDENTIDADE CORPORATIVA VALIDADA NO WORKER -----
+  let loggedUser = null;
+
+  function initials(name){
+    const parts = name.trim().split(/\s+/);
+    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+  }
+
+  const loginError = document.getElementById('loginError');
+  const loginCardEmail = document.getElementById('loginCardEmail');
+  const loginCardSpinner = document.getElementById('loginCardSpinner');
+  const loginScreen = document.getElementById('loginScreen');
+  const mainApp = document.getElementById('mainApp');
+
+  function showLoginError(message){
+    loginError.textContent = message;
+    loginCardSpinner.style.display = 'none';
+    loginCardEmail.style.display = 'block';
+    loginError.style.display = 'block';
+  }
+
+  function completeLogin(user){
+    loggedUser = user;
+    loginError.style.display = 'none';
+    loginCardEmail.style.display = 'none';
+    loginCardSpinner.style.display = 'none';
+    loginScreen.style.display = 'none';
+    mainApp.style.display = 'block';
+    startApp();
+  }
+
+  async function authenticate(){
+    try{
+      const response = await fetch(`${APP_CONFIG.apiBaseUrl}/me`, {
+        credentials:'same-origin', headers:{'Accept':'application/json'}
+      });
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok) throw new Error(payload.message || 'Acesso não autorizado.');
+      completeLogin(payload);
+    }catch(err){
+      showLoginError(err.message || 'Não foi possível validar o acesso corporativo.');
+    }
+  }
+
+  authenticate();
+
+  // ----- APP (só inicia depois do "login") -----
+  async function startApp(){
+  const STORAGE_KEY = 'forestpaper:apontamentos';
+  let records = [];
+  let qualityWorkbook = null;
+  let qualityWorkbookHandle = null;
+  let qualityWorkbookName = 'qualidade.xlsx';
+
+  const loadingBox = document.getElementById('loadingBox');
+  const appBody = document.getElementById('appBody');
+
+  const excelStatus = document.getElementById('qualityExcelStatus');
+  const excelDownloadBtn = document.getElementById('downloadQualityExcelBtn');
+
+  function setExcelStatus(message, connected=false){
+    excelStatus.textContent = message;
+    excelStatus.classList.toggle('connected', connected);
+  }
+
+  async function loadQualityWorkbook(file, handle=null){
+    try{
+      setExcelStatus('Lendo a estrutura da planilha...');
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer,{type:'array',cellDates:true,cellStyles:true});
+      const requiredSheets = ['Diário','Klabin','Tubetes'];
+      const missing = requiredSheets.filter(name=>!workbook.SheetNames.includes(name));
+      if(missing.length) throw new Error(`Abas ausentes: ${missing.join(', ')}`);
+      qualityWorkbook = workbook;
+      qualityWorkbookHandle = handle;
+      qualityWorkbookName = file.name || 'qualidade.xlsx';
+      excelDownloadBtn.disabled = false;
+      setExcelStatus(`${qualityWorkbookName} conectada · registros serão gravados no padrão do setor.`,true);
+    }catch(err){
+      console.error('Erro ao conectar planilha',err);
+      qualityWorkbook = null;
+      qualityWorkbookHandle = null;
+      excelDownloadBtn.disabled = true;
+      setExcelStatus(`Não foi possível conectar: ${err.message}`);
+    }
+  }
+
+  async function chooseQualityWorkbook(){
+    if('showOpenFilePicker' in window){
+      try{
+        const [handle] = await window.showOpenFilePicker({
+          multiple:false,
+          types:[{description:'Planilha Excel da Qualidade',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]
+        });
+        await loadQualityWorkbook(await handle.getFile(),handle);
+        return;
+      }catch(err){
+        if(err.name==='AbortError') return;
+      }
+    }
+    document.getElementById('qualityExcelInput').click();
+  }
+
+  function numericExcel(value){
+    const number = toNum(value);
+    return Number.isNaN(number) ? (value || null) : number;
+  }
+
+  function qualityExcelTarget(rec){
+    if(rec.tipoAmostragem==='Tubetes') return 'Tubetes';
+    if((rec.cliente||'').toLowerCase().includes('klabin')) return 'Klabin';
+    return 'Diário';
+  }
+
+  function qualityExcelRow(rec,sheetName){
+    const data = new Date(rec.criadoEm);
+    const turno = ({'1º Turno':'A','2º Turno':'B','3º Turno':'C'})[rec.turno] || rec.turno;
+    if(sheetName==='Tubetes') return [[
+      numericExcel(rec.contagemOP)||1, data, numericExcel(rec.polegadas), rec.lote,
+      numericExcel(rec.umidade), numericExcel(rec.espParede), numericExcel(rec.diamExterno),
+      numericExcel(rec.diamInterno), numericExcel(rec.compressao), numericExcel(rec.comprimento), ''
+    ]];
+    if(sheetName==='Klabin') return [[
+      data, rec.inspetor, turno, rec.maquina, rec.cliente, rec.numeroOP, numericExcel(rec.contagemOP),
+      rec.produto, rec.lote, numericExcel(rec.numeroPallet), rec.inicioMeioFim,
+      numericExcel(rec.formatoLargura), numericExcel(rec.formatoAltura), numericExcel(rec.gramatura),
+      numericExcel(rec.espessura), numericExcel(rec.brilho), String(rec.status||'').toUpperCase(), ''
+    ]];
+    return [[
+      data, rec.inspetor, turno, rec.maquina, rec.cliente, rec.numeroOP, rec.produto, rec.lote,
+      numericExcel(rec.formatoLargura), numericExcel(rec.formatoAltura), numericExcel(rec.gramatura),
+      numericExcel(rec.espessura), numericExcel(rec.brilho), rec.direcaoFilme, numericExcel(rec.cobb),
+      numericExcel(rec.umidade), rec.colagem, rec.embalagem, rec.desvioEncontrado,
+      String(rec.status||'').toUpperCase(), numericExcel(rec.contOp), numericExcel(rec.contCondicao), rec.observacoes, ''
+    ]];
+  }
+
+  function qualityWorkbookBytes(){
+    return XLSX.write(qualityWorkbook,{bookType:'xlsx',type:'array',cellDates:true,compression:true});
+  }
+
+  function appendRowFollowingTemplate(sheet,rowMatrix){
+    const currentRange = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
+    const targetRow = currentRange.e.r + 1;
+    XLSX.utils.sheet_add_aoa(sheet,rowMatrix,{origin:{r:targetRow,c:0},cellDates:true});
+    rowMatrix[0].forEach((value,column)=>{
+      const previous = sheet[XLSX.utils.encode_cell({r:targetRow-1,c:column})];
+      const current = sheet[XLSX.utils.encode_cell({r:targetRow,c:column})];
+      if(!previous || !current) return;
+      if(previous.s) current.s = JSON.parse(JSON.stringify(previous.s));
+      if(previous.z) current.z = previous.z;
+    });
+    if(sheet['!autofilter'] && sheet['!autofilter'].ref){
+      const filterRange = XLSX.utils.decode_range(sheet['!autofilter'].ref);
+      filterRange.e.r = targetRow;
+      sheet['!autofilter'].ref = XLSX.utils.encode_range(filterRange);
+    }
+  }
+
+  async function appendToQualityWorkbook(rec){
+    if(!qualityWorkbook) return false;
+    const sheetName = qualityExcelTarget(rec);
+    const sheet = qualityWorkbook.Sheets[sheetName];
+    if(!sheet) throw new Error(`A aba ${sheetName} não existe na planilha conectada.`);
+    appendRowFollowingTemplate(sheet,qualityExcelRow(rec,sheetName));
+    excelDownloadBtn.disabled = false;
+    if(qualityWorkbookHandle){
+      try{
+        const permission = await qualityWorkbookHandle.requestPermission({mode:'readwrite'});
+        if(permission==='granted'){
+          const writable = await qualityWorkbookHandle.createWritable();
+          await writable.write(qualityWorkbookBytes());
+          await writable.close();
+          setExcelStatus(`Registro incluído em ${sheetName} e salvo em ${qualityWorkbookName}.`,true);
+          return true;
+        }
+      }catch(err){ console.warn('Salvamento direto indisponível',err); }
+    }
+    setExcelStatus(`Registro incluído em ${sheetName}. Use “Baixar planilha atualizada” para salvar a nova versão.`,true);
+    return true;
+  }
+
+  function downloadQualityWorkbook(){
+    if(!qualityWorkbook) return;
+    const blob = new Blob([qualityWorkbookBytes()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const link = document.createElement('a');
+    const stem = qualityWorkbookName.replace(/\.xlsx?$/i,'');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${stem}-atualizada.xlsx`;
+    link.click();
+    setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+  }
+
+  // exibe o usuário logado na topbar
+  const userChip = document.getElementById('userChip');
+  const roleLabel = loggedUser.role === 'producao' ? 'Produção' : loggedUser.role === 'diretoria' ? 'Diretoria' : 'Qualidade';
+  userChip.innerHTML = `<div class="avatar">${initials(loggedUser.name)}</div><span>${loggedUser.name}</span><span class="role-badge">${roleLabel}</span><button id="logoutBtn">Sair</button>`;
+  document.getElementById('logoutBtn').addEventListener('click', ()=>{
+    location.href = '/cdn-cgi/access/logout?returnTo=/';
+  });
+
+  function configureAccess(){
+    const isProduction = loggedUser.role === 'producao';
+    const isDirector = loggedUser.role === 'diretoria';
+    document.querySelectorAll('.tab-btn').forEach(btn=>{
+      const allowed = isProduction
+        ? btn.dataset.tab === 'producao'
+        : isDirector
+          ? btn.dataset.tab === 'diretoria'
+          : ['qualidade','apontamento','painel'].includes(btn.dataset.tab);
+      btn.hidden = !allowed;
+      btn.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-panel').forEach(panel=>panel.classList.remove('active'));
+    const firstTab = isProduction ? 'producao' : isDirector ? 'diretoria' : 'qualidade';
+    document.querySelector(`.tab-btn[data-tab="${firstTab}"]`).classList.add('active');
+    document.getElementById(`tab-${firstTab}`).classList.add('active');
+    document.getElementById('kpiRow').style.display = loggedUser.role === 'qualidade' ? '' : 'none';
+  }
+  configureAccess();
+  // pré-preenche o inspetor com o usuário logado
+  setTimeout(()=>{
+    const inspetorField = document.getElementById('inspetor');
+    if(inspetorField && !inspetorField.value) inspetorField.value = loggedUser.name;
+  }, 0);
+
+  function fmtTime(iso){
+    const d = new Date(iso);
+    return d.toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  }
+
+  async function loadRecords(){
+    try{
+      const res = await storageAdapter.get(STORAGE_KEY);
+      records = res && res.value ? JSON.parse(res.value) : [];
+    }catch(err){
+      records = [];
+    }
+  }
+
+  async function persist(){
+    try{
+      await storageAdapter.set(STORAGE_KEY, JSON.stringify(records));
+    }catch(err){
+      console.error('Erro ao salvar registros', err);
+      alert('Não foi possível salvar o registro agora. Tente novamente.');
+    }
+  }
+
+  // ----- PRODUÇÃO: pedidos (simulação de integração com o Protheus) e máquinas -----
+  const PEDIDOS_KEY = 'forestpaper:pedidos';
+  const MAQUINAS_KEY = 'forestpaper:maquinas';
+  let pedidos = [];
+  let maquinas = [];
+  let ordersExcelName = '';
+
+  const MOCK_PRODUTOS = ['Papel Kraft 80g/m²','Papel Couché Fosco','Papel Offset 75g','Bobina Jumbo 120g','Papel Cartão 250g'];
+  const MOCK_CLIENTES = ['Klabin','Cliente A','Cliente B','Distribuidora Sul','Embalagens Norte'];
+
+  function randomOrder(){
+    const produto = MOCK_PRODUTOS[Math.floor(Math.random()*MOCK_PRODUTOS.length)];
+    const cliente = MOCK_CLIENTES[Math.floor(Math.random()*MOCK_CLIENTES.length)];
+    return {
+      id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+      numeroOP: String(100000+Math.floor(Math.random()*90000)),
+      cliente, produto,
+      quantidade: (Math.floor(Math.random()*20)+2)+' ton',
+      valorCarga: (Math.floor(Math.random()*18)+7)*10000,
+      dataPrevista: new Date(Date.now()+86400000*(Math.floor(Math.random()*3)+1)).toLocaleDateString('pt-BR'),
+      status: 'Aguardando',
+      maquina: '', iniciadoEm: null, iniciadoPor: null, concluidoEm: null,
+    };
+  }
+
+  function setSyncStatus(message, connected){
+    const box = document.getElementById('protheusSyncStatus');
+    if(!box) return;
+    box.classList.toggle('offline', !connected);
+    box.querySelector('span:last-child').textContent = message;
+  }
+
+  function normalizeOrder(raw){
+    const apiStatus = String(raw.status || raw.C2_STATUS || 'Aguardando').toLowerCase();
+    let status = 'Aguardando';
+    if(apiStatus.includes('cliente') || apiStatus.includes('liberad')) status = 'Liberado ao cliente';
+    else if(apiStatus.includes('inspe')) status = 'Em inspeção';
+    else if(apiStatus.includes('qualidade') || apiStatus.includes('conclu') || apiStatus.includes('final')) status = 'Aguardando qualidade';
+    else if(apiStatus.includes('corre') || apiStatus.includes('reprov')) status = 'Correção na produção';
+    else if(apiStatus.includes('produ')) status = 'Em produção';
+    return {
+      id: String(raw.id || raw.numeroOP || raw.numeroPedidoVenda || raw.C2_NUM || raw.C5_NUM || raw.op || raw.pedido),
+      numeroOP: String(raw.numeroOP || raw.numeroPedidoVenda || raw.C2_NUM || raw.C5_NUM || raw.op || raw.pedido || ''),
+      cliente: raw.cliente || raw.A1_NOME || 'Cliente não informado',
+      produto: raw.produto || raw.B1_DESC || raw.descricao || 'Produto não informado',
+      quantidade: String(raw.quantidade || raw.C2_QUANT || ''),
+      valorCarga: Number(raw.valorCarga || raw.valorTotal || raw.total || raw.C5_VALOR || 0),
+      dataPrevista: raw.dataPrevista || raw.C2_DATPRI || raw.previsao || 'Sem previsão',
+      filial: String(raw.filial || ''),
+      item: String(raw.item || ''),
+      codigoProduto: String(raw.codigoProduto || ''),
+      unidade: String(raw.unidade || ''),
+      cidade: String(raw.cidade || ''),
+      uf: String(raw.uf || ''),
+      notaFiscal: String(raw.notaFiscal || ''),
+      dataEmissao: raw.dataEmissao || '',
+      status,
+      maquina: raw.maquina || '',
+      iniciadoEm: raw.iniciadoEm || null,
+      iniciadoPor: raw.iniciadoPor || null,
+      producaoConcluidaEm: raw.producaoConcluidaEm || raw.concluidoEm || null,
+      qualidadeIniciadaEm: raw.qualidadeIniciadaEm || null,
+      qualidadePor: raw.qualidadePor || null,
+      liberadoEm: raw.liberadoEm || null,
+      liberadoPor: raw.liberadoPor || null
+    };
+  }
+
+  function normalizeHeader(value){
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  }
+
+  function valueByAliases(row, aliases){
+    const indexed = Object.fromEntries(Object.entries(row).map(([key,value])=>[normalizeHeader(key),value]));
+    for(const alias of aliases){
+      const value = indexed[normalizeHeader(alias)];
+      if(value !== undefined && value !== null && String(value).trim() !== '') return value;
+    }
+    return '';
+  }
+
+  function excelDate(value){
+    if(!value) return 'Sem previsao';
+    if(value instanceof Date && !Number.isNaN(value.getTime())) return value.toLocaleDateString('pt-BR');
+    if(/^\d{8}$/.test(String(value))){
+      const text = String(value);
+      return `${text.slice(6,8)}/${text.slice(4,6)}/${text.slice(0,4)}`;
+    }
+    if(typeof value === 'number'){
+      const parsed = XLSX.SSF.parse_date_code(value);
+      if(parsed) return new Date(parsed.y,parsed.m-1,parsed.d).toLocaleDateString('pt-BR');
+    }
+    return String(value);
+  }
+
+  function erpDateObject(value){
+    if(value instanceof Date && !Number.isNaN(value.getTime())) return value;
+    const text = String(value || '').trim();
+    if(/^\d{8}$/.test(text)) return new Date(Number(text.slice(0,4)),Number(text.slice(4,6))-1,Number(text.slice(6,8)));
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  async function importOrdersWorkbook(file){
+    const statusBox = document.getElementById('ordersExcelStatus');
+    statusBox.textContent = 'Lendo pedidos da planilha...';
+    try{
+      const workbook = XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+      const preferred = workbook.SheetNames.find(name=>/pedido|venda|ordem|produc/i.test(normalizeHeader(name))) || workbook.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[preferred],{defval:'',raw:true});
+      const mode = document.getElementById('ordersImportMode').value;
+      const days = mode === 'recent365' ? 365 : 120;
+      const cutoff = new Date();
+      cutoff.setHours(0,0,0,0);
+      cutoff.setDate(cutoff.getDate()-days);
+      const filteredRows = rows.filter(row=>{
+        const rawDate = valueByAliases(row,['data emissao','c5_emissao']);
+        const date = erpDateObject(rawDate);
+        if(!date || date < cutoff) return false;
+        if(mode !== 'pending120') return true;
+        const invoice = String(valueByAliases(row,['nota fiscal','c5_nota'])).trim();
+        return !invoice || /^x+$/i.test(invoice);
+      });
+      const limitedRows = filteredRows.slice(0,3000);
+      const imported = limitedRows.map(row=>{
+        const numero = valueByAliases(row,['pedido de venda','numero pedido venda','n pedido','numero pedido','pedido','c5_num','op','numero op','c2_num']);
+        if(!numero) return null;
+        const filial = valueByAliases(row,['filial','c5_filial']);
+        const item = valueByAliases(row,['item','c6_item']);
+        const codigoProduto = valueByAliases(row,['cod produto','codigo produto','c6_produto']);
+        const rawDate = valueByAliases(row,['data emissao','c5_emissao']);
+        return normalizeOrder({
+          id:[filial,numero,item || codigoProduto].filter(Boolean).join('-'), numeroPedidoVenda:String(numero),
+          cliente:valueByAliases(row,['cliente','nome cliente','razao social','a1_nome']),
+          produto:valueByAliases(row,['produto','descricao produto','descricao','b1_desc']),
+          quantidade:valueByAliases(row,['quantidade','qtd','c6_qtdven','c5_qtdven','c2_quant']),
+          valorCarga:valueByAliases(row,['valor','valor total','valor total item','c6_valor','total pedido','c5_valor']),
+          dataPrevista:excelDate(valueByAliases(row,['data prevista','previsao','entrega','data entrega','c5_fecent','c2_datpri']) || rawDate),
+          dataEmissao:excelDate(rawDate),
+          filial,
+          item,
+          codigoProduto,
+          unidade:valueByAliases(row,['unidade','c6_unsven']),
+          cidade:valueByAliases(row,['cidade','a1_mun']),
+          uf:valueByAliases(row,['uf','a1_est']),
+          notaFiscal:valueByAliases(row,['nota fiscal','c5_nota']),
+          status:valueByAliases(row,['status','situacao']) || 'Aguardando'
+        });
+      }).filter(Boolean);
+      if(!imported.length) throw new Error('nenhuma coluna de numero do pedido foi encontrada');
+      pedidos = imported;
+      ordersExcelName = file.name;
+      await persistPedidos();
+      renderPedidos(); renderFilaQualidade(); renderDashboardProducao();
+      const capped = filteredRows.length > limitedRows.length ? ` Limite de ${limitedRows.length} itens aplicado.` : '';
+      statusBox.textContent = `${file.name} importada - ${pedidos.length} item(ns) carregado(s).${capped}`;
+      statusBox.classList.add('connected');
+      setSyncStatus(`Excel conectado - ${pedidos.length} pedido(s)`, true);
+    }catch(err){
+      console.error('Erro ao importar pedidos do Excel',err);
+      statusBox.textContent = `Nao foi possivel importar: ${err.message}.`;
+      statusBox.classList.remove('connected');
+    }
+  }
+
+  async function syncOrdersFromProtheus(showFeedback=false){
+    setSyncStatus('Consultando base compartilhada...', true);
+    try{
+      const response = await fetch(APP_CONFIG.protheusApiUrl, {credentials:'include', headers:{'Accept':'application/json'}});
+      if(!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      const list = Array.isArray(payload) ? payload : (payload.orders || payload.data || []);
+      pedidos = list.map(normalizeOrder);
+      await persistPedidos();
+      renderPedidos();
+      renderFilaQualidade();
+      renderDashboardProducao();
+      const updatedAt = payload.updatedAt ? new Date(payload.updatedAt) : new Date();
+      setSyncStatus(`Cloud conectado · atualizado às ${updatedAt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`, true);
+    }catch(err){
+      console.error('Falha na sincronização com a base Cloudflare', err);
+      setSyncStatus('Sem conexão · exibindo última atualização', false);
+      if(showFeedback) alert('Não foi possível atualizar as OPs agora. A última lista disponível continuará na tela.');
+    }
+  }
+
+  async function loadPedidos(){
+    pedidos = [];
+    await syncOrdersFromProtheus(false);
+  }
+  async function persistPedidos(){
+    if(!ordersExcelName) return;
+    try{
+      const response = await fetch(APP_CONFIG.protheusApiUrl, {
+        method:'PUT', credentials:'same-origin',
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify({orders:pedidos})
+      });
+      if(!response.ok) throw new Error(`HTTP ${response.status}`);
+    }catch(err){
+      console.error('Erro ao enviar pedidos importados', err);
+      throw err;
+    }
+  }
+
+  async function updatePedidoStatus(pedido, changes){
+    if(APP_CONFIG.protheusApiUrl){
+      const url = `${APP_CONFIG.protheusApiUrl.replace(/\/$/,'')}/${encodeURIComponent(pedido.id)}`;
+      const response = await fetch(url, {
+        method:'PATCH', credentials:'same-origin',
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify(changes)
+      });
+      if(!response.ok) throw new Error(`HTTP ${response.status}`);
+    }
+    Object.assign(pedido, changes);
+  }
+
+  async function loadMaquinas(){
+    try{
+      const res = await storageAdapter.get(MAQUINAS_KEY);
+      maquinas = res && res.value ? JSON.parse(res.value) : [];
+    }catch(err){ maquinas = []; }
+    if(maquinas.length===0){
+      maquinas = ['Máquina 1','Máquina 2','Acabamento','Rebobinadeira','Cantoneira 1','Cantoneira 2'];
+      await persistMaquinas();
+    }
+  }
+  async function persistMaquinas(){
+    try{ await storageAdapter.set(MAQUINAS_KEY, JSON.stringify(maquinas)); }
+    catch(err){ console.error('Erro ao salvar máquinas', err); }
+  }
+
+  function timeAgo(iso){
+    if(!iso) return '';
+    const mins = Math.max(0, Math.round((Date.now()-new Date(iso).getTime())/60000));
+    if(mins < 1) return 'agora mesmo';
+    if(mins < 60) return `há ${mins} min`;
+    const hrs = Math.floor(mins/60);
+    return `há ${hrs}h${mins%60 ? (mins%60)+'min' : ''}`;
+  }
+
+  function renderMachineChips(){
+    const box = document.getElementById('machineChips');
+    box.innerHTML = maquinas.map((m,i)=>`
+      <div class="machine-chip"><span>${escapeHtml(m)}</span><button data-idx="${i}" class="rm-machine" title="Remover">✕</button></div>
+    `).join('');
+    box.querySelectorAll('.rm-machine').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        maquinas.splice(parseInt(btn.dataset.idx),1);
+        await persistMaquinas();
+        renderMachineChips();
+        renderPedidos();
+      });
+    });
+  }
+
+  function machineOptionsHtml(selected){
+    return `<option value="">Selecione a máquina</option>` + maquinas.map(m=>`<option ${m===selected?'selected':''}>${escapeHtml(m)}</option>`).join('');
+  }
+
+  function renderPedidos(){
+    if(loggedUser.role !== 'producao') return;
+    const query = normalizeHeader((document.getElementById('orderSearch') || {}).value || '');
+    const matchesSearch = p=>!query || normalizeHeader([p.numeroOP,p.cliente,p.produto,p.codigoProduto,p.filial,p.item].join(' ')).includes(query);
+    const aguardandoTodos = pedidos.filter(p=>p.status==='Aguardando' || p.status==='Correção na produção');
+    const aguardando = aguardandoTodos.filter(matchesSearch);
+    const emProducao = pedidos.filter(p=>p.status==='Em produção' && matchesSearch(p));
+    const summary = document.getElementById('orderSummaryText');
+    if(summary){
+      const totalValue = aguardandoTodos.reduce((sum,p)=>sum+Number(p.valorCarga || 0),0);
+      summary.textContent = `${aguardando.length} de ${aguardandoTodos.length} item(ns) · ${formatCurrency(totalValue)}`;
+    }
+
+    const aguardandoBox = document.getElementById('pedidosAguardando');
+    if(aguardandoBox){
+      aguardandoBox.innerHTML = aguardando.length===0
+        ? `<div class="empty-note">Nenhum pedido aguardando início no momento.</div>`
+        : aguardando.map(p=>`
+          <div class="order-card">
+            <div class="oc-info">
+              <div class="oc-title">${escapeHtml(p.produto)} — ${escapeHtml(p.cliente)}</div>
+              <div class="oc-meta">Pedido ${escapeHtml(p.numeroOP)} · item ${escapeHtml(p.item||'--')} · ${escapeHtml(p.quantidade)}${p.unidade && p.unidade !== '0' ? ' '+escapeHtml(p.unidade) : ''} · ${formatCurrency(p.valorCarga)}</div>
+              <div class="order-details">
+                ${p.filial ? `<span class="order-detail">Filial ${escapeHtml(p.filial)}</span>` : ''}
+                ${p.codigoProduto ? `<span class="order-detail">Produto ${escapeHtml(p.codigoProduto)}</span>` : ''}
+                ${(p.cidade||p.uf) ? `<span class="order-detail">${escapeHtml([p.cidade,p.uf].filter(Boolean).join(' / '))}</span>` : ''}
+                <span class="order-detail">Emissão ${escapeHtml(p.dataEmissao||p.dataPrevista)}</span>
+              </div>
+            </div>
+            <div class="oc-actions">
+              <select data-pedido="${p.id}" class="machine-select">${machineOptionsHtml('')}</select>
+              <button class="btn btn-primary start-btn" data-pedido="${p.id}">Iniciar produção</button>
+            </div>
+          </div>
+        `).join('');
+      aguardandoBox.querySelectorAll('.start-btn').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const sel = aguardandoBox.querySelector(`.machine-select[data-pedido="${btn.dataset.pedido}"]`);
+          if(!sel.value){ alert('Selecione a máquina ou cantoneira antes de iniciar.'); return; }
+          const p = pedidos.find(x=>x.id===btn.dataset.pedido);
+          btn.disabled = true;
+          try{
+            await updatePedidoStatus(p, {status:'Em produção', maquina:sel.value, iniciadoEm:new Date().toISOString(), iniciadoPor:loggedUser.name});
+            renderPedidos(); renderDashboardProducao();
+          }catch(err){
+            console.error('Erro ao iniciar OP', err);
+            alert('Não foi possível iniciar esta OP no Protheus. Tente novamente.');
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    const emProducaoBox = document.getElementById('pedidosEmProducao');
+    if(emProducaoBox){
+      emProducaoBox.innerHTML = emProducao.length===0
+        ? `<div class="empty-note">Nenhum pedido em produção no momento.</div>`
+        : emProducao.map(p=>`
+          <div class="order-card">
+            <div class="oc-info">
+              <div class="oc-title">${escapeHtml(p.produto)} — ${escapeHtml(p.cliente)}</div>
+              <div class="oc-meta">Pedido ${escapeHtml(p.numeroOP)} · item ${escapeHtml(p.item||'--')} · ${escapeHtml(p.maquina)} · iniciado ${timeAgo(p.iniciadoEm)} por ${escapeHtml(p.iniciadoPor||'')}</div>
+            </div>
+            <div class="oc-actions">
+              <button class="btn btn-outline finish-btn" data-pedido="${p.id}">Concluir e enviar à Qualidade</button>
+            </div>
+          </div>
+        `).join('');
+      emProducaoBox.querySelectorAll('.finish-btn').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const p = pedidos.find(x=>x.id===btn.dataset.pedido);
+          btn.disabled = true;
+          try{
+            await updatePedidoStatus(p, {status:'Aguardando qualidade', producaoConcluidaEm:new Date().toISOString()});
+            renderPedidos(); renderFilaQualidade(); renderDashboardProducao();
+          }catch(err){
+            console.error('Erro ao concluir OP', err);
+            alert('Não foi possível concluir esta OP no Protheus. Tente novamente.');
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+  }
+
+  function workflowHtml(status){
+    const qualityStatuses = ['Aguardando qualidade','Em inspeção'];
+    const stage = status === 'Liberado ao cliente' ? 2 : qualityStatuses.includes(status) ? 1 : 0;
+    const labels = ['Produção','Qualidade','Cliente'];
+    return `<div class="workflow" aria-label="Fluxo: Produção, Qualidade e Cliente">${labels.map((label,index)=>{
+      const stateClass = index < stage ? 'done' : index === stage ? 'current' : '';
+      return `<div class="workflow-step ${stateClass}">${label}</div>`;
+    }).join('')}</div>`;
+  }
+
+  function renderFilaQualidade(){
+    const box = document.getElementById('filaQualidade');
+    if(!box || loggedUser.role !== 'qualidade') return;
+    const fila = pedidos
+      .filter(p=>['Aguardando qualidade','Em inspeção'].includes(p.status))
+      .sort((a,b)=>new Date(a.producaoConcluidaEm||0)-new Date(b.producaoConcluidaEm||0));
+    box.innerHTML = fila.length===0
+      ? `<div class="empty-note">Nenhuma carga aguardando a Qualidade no momento.</div>`
+      : fila.map(p=>`
+        <article class="quality-card">
+          <div>
+            <span class="pill qualidade">${escapeHtml(p.status)}</span>
+            <h4>${escapeHtml(p.produto)} — ${escapeHtml(p.cliente)}</h4>
+            <div class="q-meta">OP ${escapeHtml(p.numeroOP)} · ${escapeHtml(p.maquina||'Máquina não informada')} · ${escapeHtml(p.quantidade||'Quantidade não informada')} · ${formatCurrency(p.valorCarga)}</div>
+            ${workflowHtml(p.status)}
+          </div>
+          <div class="quality-actions">
+            ${p.status==='Aguardando qualidade'
+              ? `<button class="btn btn-primary inspect-btn" data-pedido="${p.id}">Iniciar inspeção</button>`
+              : `<button class="btn btn-danger reject-quality-btn" data-pedido="${p.id}">Devolver à Produção</button><button class="btn btn-success approve-quality-btn" data-pedido="${p.id}">Liberar ao cliente</button>`}
+          </div>
+        </article>`).join('');
+
+    box.querySelectorAll('.inspect-btn').forEach(btn=>btn.addEventListener('click', async ()=>{
+      const p = pedidos.find(x=>x.id===btn.dataset.pedido);
+      btn.disabled = true;
+      try{
+        await updatePedidoStatus(p,{status:'Em inspeção',qualidadeIniciadaEm:new Date().toISOString(),qualidadePor:loggedUser.name});
+        renderFilaQualidade(); renderDashboardProducao();
+      }catch(err){ alert('Não foi possível iniciar a inspeção agora.'); btn.disabled=false; }
+    }));
+    box.querySelectorAll('.approve-quality-btn').forEach(btn=>btn.addEventListener('click', async ()=>{
+      const p = pedidos.find(x=>x.id===btn.dataset.pedido);
+      btn.disabled = true;
+      try{
+        await updatePedidoStatus(p,{status:'Liberado ao cliente',liberadoEm:new Date().toISOString(),liberadoPor:loggedUser.name});
+        renderFilaQualidade(); renderDashboardProducao();
+      }catch(err){ alert('Não foi possível liberar esta carga agora.'); btn.disabled=false; }
+    }));
+    box.querySelectorAll('.reject-quality-btn').forEach(btn=>btn.addEventListener('click', async ()=>{
+      const p = pedidos.find(x=>x.id===btn.dataset.pedido);
+      if(!confirm('Devolver esta carga para correção na Produção?')) return;
+      btn.disabled = true;
+      try{
+        await updatePedidoStatus(p,{status:'Correção na produção',qualidadeReprovadaEm:new Date().toISOString(),qualidadePor:loggedUser.name});
+        renderFilaQualidade(); renderDashboardProducao();
+      }catch(err){ alert('Não foi possível devolver esta carga agora.'); btn.disabled=false; }
+    }));
+  }
+
+  function renderDashboardProducao(){
+    const kpiBox = document.getElementById('kpiRowProducao');
+    if(!kpiBox) return;
+    const emProducao = pedidos.filter(p=>['Em produção','Correção na produção'].includes(p.status));
+    const naQualidade = pedidos.filter(p=>['Aguardando qualidade','Em inspeção'].includes(p.status));
+    const liberados = pedidos.filter(p=>p.status==='Liberado ao cliente');
+    const itensDashboard = [...emProducao, ...naQualidade, ...liberados];
+    const valorTotal = itensDashboard.reduce((total,p)=>total + Number(p.valorCarga || 0), 0);
+    const valorEmProducao = emProducao.reduce((total,p)=>total + Number(p.valorCarga || 0), 0);
+    const valorQualidade = naQualidade.reduce((total,p)=>total + Number(p.valorCarga || 0), 0);
+    const valorLiberado = liberados.reduce((total,p)=>total + Number(p.valorCarga || 0), 0);
+    const valorMedio = itensDashboard.length ? valorTotal / itensDashboard.length : 0;
+    const totalStatus = Math.max(1, itensDashboard.length);
+    const pctProducao = (emProducao.length / totalStatus) * 100;
+    const pctQualidade = (naQualidade.length / totalStatus) * 100;
+    const pctLiberado = (liberados.length / totalStatus) * 100;
+    kpiBox.innerHTML = `
+      <article class="exec-metric" style="--metric-color:var(--roxo-dim)">
+        <div class="metric-label">Em produção agora</div>
+        <div class="metric-value">${emProducao.length}</div>
+        <div class="metric-note">${formatCurrency(valorEmProducao)} em cargas ativas</div>
+      </article>
+      <article class="exec-metric" style="--metric-color:#E3B341">
+        <div class="metric-label">Na Qualidade</div>
+        <div class="metric-value">${naQualidade.length}</div>
+        <div class="metric-note">${formatCurrency(valorQualidade)} aguardando liberação</div>
+      </article>
+      <article class="exec-metric" style="--metric-color:var(--verde-claro)">
+        <div class="metric-label">Liberadas ao cliente</div>
+        <div class="metric-value">${liberados.length}</div>
+        <div class="metric-note">${formatCurrency(valorLiberado)} liberados</div>
+      </article>
+      <article class="exec-metric" style="--metric-color:var(--kraft)">
+        <div class="metric-label">Valor total das cargas</div>
+        <div class="metric-value" style="font-size:clamp(27px,2.6vw,43px)">${formatCurrency(valorTotal)}</div>
+        <div class="metric-note">Média de ${formatCurrency(valorMedio)} por carga</div>
+      </article>
+    `;
+    const statusResumo = document.getElementById('dashStatusResumo');
+    if(statusResumo){
+      statusResumo.innerHTML = `
+        <div class="status-track" aria-label="${Math.round(pctProducao)}% em produção, ${Math.round(pctQualidade)}% na qualidade e ${Math.round(pctLiberado)}% liberadas">
+          <span class="active" style="width:${pctProducao}%"></span><span class="quality" style="width:${pctQualidade}%"></span><span class="done" style="width:${pctLiberado}%"></span>
+        </div>
+        <div class="status-legend">
+          <div class="status-legend-row"><span class="legend-dot" style="--dot:var(--roxo-dim)"></span>Em produção <b>${Math.round(pctProducao)}%</b></div>
+          <div class="status-legend-row"><span class="legend-dot" style="--dot:#E3B341"></span>Qualidade <b>${Math.round(pctQualidade)}%</b></div>
+          <div class="status-legend-row"><span class="legend-dot" style="--dot:var(--verde-claro)"></span>Cliente <b>${Math.round(pctLiberado)}%</b></div>
+        </div>`;
+    }
+    const financeiro = document.getElementById('dashFinanceiro');
+    if(financeiro){
+      financeiro.innerHTML = `
+        <div class="finance-grid">
+          <div class="finance-cell"><div class="finance-label">Em produção</div><div class="finance-value">${formatCurrency(valorEmProducao)}</div></div>
+          <div class="finance-cell"><div class="finance-label">Na Qualidade</div><div class="finance-value">${formatCurrency(valorQualidade)}</div></div>
+          <div class="finance-cell full"><div class="finance-label">Liberado ao cliente</div><div class="finance-value">${formatCurrency(valorLiberado)}</div></div>
+        </div>`;
+    }
+    const renderDirectorOrders = (box, list, emptyMessage)=>{
+      if(!box) return;
+      const eventDate = p=>p.liberadoEm||p.qualidadeIniciadaEm||p.producaoConcluidaEm||p.iniciadoEm||0;
+      const sorted = [...list].sort((a,b)=>new Date(eventDate(b))-new Date(eventDate(a)));
+      box.innerHTML = sorted.length===0
+        ? `<div class="empty-note">${emptyMessage}</div>`
+        : sorted.map(p=>`
+          <article class="director-order-card">
+            <div class="director-order-top">
+              <div class="director-order-op">OP ${escapeHtml(p.numeroOP)}</div>
+              <span class="pill ${p.status==='Liberado ao cliente'?'cliente':['Aguardando qualidade','Em inspeção'].includes(p.status)?'qualidade':'producao'}">${escapeHtml(p.status)}</span>
+            </div>
+            <div class="director-order-title">${escapeHtml(p.produto)} · ${escapeHtml(p.cliente)}</div>
+            ${workflowHtml(p.status)}
+            <div class="director-order-meta">
+              <div><span>Máquina</span><b title="${escapeHtml(p.maquina||'Não informada')}">${escapeHtml(p.maquina||'Não informada')}</b></div>
+              <div><span>Responsável</span><b title="${escapeHtml(p.iniciadoPor||'Não informado')}">${escapeHtml(p.iniciadoPor||'Não informado')}</b></div>
+              <div><span>Início</span><b>${p.iniciadoEm ? fmtTime(p.iniciadoEm) : 'Não informado'}</b></div>
+              <div><span>Quantidade</span><b>${escapeHtml(p.quantidade||'Não informada')}</b></div>
+              <div class="director-order-value"><span>Valor da carga</span><strong>${formatCurrency(p.valorCarga)}</strong></div>
+            </div>
+          </article>
+        `).join('');
+    };
+    renderDirectorOrders(document.getElementById('dashEmProducao'), emProducao, 'Nenhuma OP em produção no momento.');
+    renderDirectorOrders(document.getElementById('dashQualidade'), naQualidade, 'Nenhuma carga na Qualidade agora.');
+    renderDirectorOrders(document.getElementById('dashCliente'), liberados, 'Nenhuma carga liberada ao cliente ainda.');
+    const emProducaoSub = document.getElementById('dashEmProducaoSub');
+    const qualidadeSub = document.getElementById('dashQualidadeSub');
+    const clienteSub = document.getElementById('dashClienteSub');
+    if(emProducaoSub) emProducaoSub.textContent = `${emProducao.length} carga(s) · ${formatCurrency(valorEmProducao)}`;
+    if(qualidadeSub) qualidadeSub.textContent = `${naQualidade.length} carga(s) · ${formatCurrency(valorQualidade)}`;
+    if(clienteSub) clienteSub.textContent = `${liberados.length} carga(s) · ${formatCurrency(valorLiberado)}`;
+    const updatedAt = document.getElementById('dashboardUpdatedAt');
+    if(updatedAt) updatedAt.textContent = new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  }
+
+  function formatCurrency(value){
+    return Number(value || 0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  }
+
+  function currentShiftGuess(){
+    const h = new Date().getHours();
+    if(h>=6 && h<14) return '1º Turno';
+    if(h>=14 && h<22) return '2º Turno';
+    return '3º Turno';
+  }
+
+  function statusPillClass(s){
+    if(s==='Aprovado') return 'aprovado';
+    if(s==='Reprovado') return 'reprovado';
+    return 'pendente';
+  }
+
+  function renderKPIs(){
+    const total = records.length;
+    const aprovados = records.filter(r=>r.status==='Aprovado').length;
+    const reprovados = records.filter(r=>r.status==='Reprovado').length;
+    const pendentes = records.filter(r=>r.status==='Pendente').length;
+    document.getElementById('kpiRow').innerHTML = `
+      <div class="kpi"><div class="lbl">Total de apontamentos</div><div class="val">${total}</div></div>
+      <div class="kpi"><div class="lbl">Aprovados</div><div class="val green">${aprovados}</div></div>
+      <div class="kpi"><div class="lbl">Pendentes</div><div class="val amber">${pendentes}</div></div>
+      <div class="kpi"><div class="lbl">Reprovados</div><div class="val red">${reprovados}</div></div>
+    `;
+  }
+
+  function renderTable(){
+    const turnoF = document.getElementById('filterTurno').value;
+    const statusF = document.getElementById('filterStatus').value;
+    const textF = document.getElementById('filterProduto').value.trim().toLowerCase();
+
+    let rows = [...records].sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm));
+    if(turnoF) rows = rows.filter(r=>r.turno===turnoF);
+    if(statusF) rows = rows.filter(r=>r.status===statusF);
+    if(textF) rows = rows.filter(r=> (r.produto+' '+r.lote).toLowerCase().includes(textF));
+
+    const tbody = document.getElementById('tableBody');
+    if(rows.length===0){
+      tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">Nenhum apontamento registrado ainda. Use a aba "Novo apontamento" para começar.</div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r=>`
+      <tr>
+        <td>${fmtTime(r.criadoEm)}</td>
+        <td>${escapeHtml(r.cliente||'—')}</td>
+        <td>${escapeHtml(r.numeroOP||'—')}</td>
+        <td>${escapeHtml(r.produto)}</td>
+        <td>${escapeHtml(r.lote)}</td>
+        <td>${escapeHtml(r.turno)}</td>
+        <td>${escapeHtml(r.liberado||'—')}</td>
+        <td><span class="pill ${statusPillClass(r.status)}">${r.status}</span></td>
+        <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(r.desvioEncontrado||'')}">${escapeHtml(r.desvioEncontrado||'—')}</td>
+        <td>${escapeHtml(r.inspetor)}</td>
+      </tr>
+    `).join('');
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function renderDonut(){
+    const svg = document.getElementById('donutChart');
+    const legendBox = document.getElementById('donutLegend');
+    if(!svg || !legendBox) return;
+    const total = records.length;
+    const counts = {
+      Aprovado: records.filter(r=>r.status==='Aprovado').length,
+      Pendente: records.filter(r=>r.status==='Pendente').length,
+      Reprovado: records.filter(r=>r.status==='Reprovado').length,
+    };
+    const colors = {Aprovado:'#C5F249', Pendente:'#C1B4EE', Reprovado:'#E2735F'};
+    const cx=100, cy=100, r=72, sw=26;
+    let html = '';
+    if(total===0){
+      html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(237,234,224,0.15)" stroke-width="${sw}"/>
+        <text x="${cx}" y="${cy+5}" text-anchor="middle" fill="rgba(237,234,224,0.55)" font-family="IBM Plex Mono, monospace" font-size="13">Sem dados</text>`;
+    } else {
+      let startAngle = -90;
+      const circumference = 2*Math.PI*r;
+      Object.keys(counts).forEach(key=>{
+        const val = counts[key];
+        if(val===0) return;
+        const frac = val/total;
+        const dash = frac*circumference;
+        html += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colors[key]}" stroke-width="${sw}"
+          stroke-dasharray="${dash} ${circumference-dash}" stroke-dashoffset="${-((startAngle+90)/360)*circumference}"
+          transform="rotate(-90 ${cx} ${cy})" />`;
+        startAngle += frac*360;
+      });
+      html += `<text x="${cx}" y="${cy-3}" text-anchor="middle" fill="#EDEAE0" font-family="Oswald, sans-serif" font-size="30" font-weight="600">${total}</text>
+        <text x="${cx}" y="${cy+18}" text-anchor="middle" fill="rgba(237,234,224,0.6)" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.5">TOTAL</text>`;
+    }
+    svg.innerHTML = html;
+
+    if(total===0){
+      legendBox.innerHTML = `<div class="dl-row"><span class="dl-label">Registre o primeiro apontamento para ver a distribuição aqui.</span></div>`;
+      return;
+    }
+    legendBox.innerHTML = Object.keys(colors).map(key=>{
+      const val = counts[key];
+      const pct = total ? Math.round((val/total)*100) : 0;
+      return `<div class="dl-row">
+        <span class="dl-dot" style="background:${colors[key]}"></span>
+        <span class="dl-label">${key}</span>
+        <span class="dl-val">${val} · ${pct}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderBarChart(){
+    const svg = document.getElementById('barChart');
+    if(!svg) return;
+    const turnos = ['1º Turno','2º Turno','3º Turno'];
+    const counts = turnos.map(t=> records.filter(r=>r.turno===t).length);
+    const max = Math.max(1, ...counts);
+    const w=640, h=260, barW=110, gap=70, baseY=200, topPad=36;
+    const totalW = turnos.length*barW + (turnos.length-1)*gap;
+    const startX = (w-totalW)/2;
+    let html = `<line x1="30" y1="${baseY}" x2="${w-30}" y2="${baseY}" stroke="rgba(22,29,26,0.18)" stroke-width="1"/>`;
+    turnos.forEach((t,i)=>{
+      const bh = counts[i]===0 ? 0 : Math.max((counts[i]/max) * (baseY-topPad), 6);
+      const x = startX + i*(barW+gap);
+      html += `
+        <rect x="${x}" y="${baseY-bh}" width="${barW}" height="${bh}" fill="#26372C" rx="3"/>
+        <text x="${x+barW/2}" y="${baseY-bh-14}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="18" fill="#161D1A" font-weight="600">${counts[i]}</text>
+        <text x="${x+barW/2}" y="${baseY+30}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" fill="rgba(22,29,26,0.65)">${t}</text>
+      `;
+    });
+    svg.innerHTML = html;
+  }
+
+  function renderAll(){
+    renderKPIs();
+    renderTable();
+    renderDonut();
+    renderBarChart();
+  }
+
+  // tabs
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // clock
+  function updateClock(){
+    const now = new Date();
+    document.getElementById('clockBox').innerHTML = now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'}) + ' · <b>' + currentShiftGuess() + '</b> · ' + now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  }
+  updateClock();
+  setInterval(updateClock, 30000);
+
+  // conexão com a planilha oficial da Qualidade
+  document.getElementById('connectQualityExcelBtn').addEventListener('click',chooseQualityWorkbook);
+  document.getElementById('qualityExcelInput').addEventListener('change',async event=>{
+    const file = event.target.files && event.target.files[0];
+    if(file) await loadQualityWorkbook(file,null);
+    event.target.value = '';
+  });
+  excelDownloadBtn.addEventListener('click',downloadQualityWorkbook);
+
+  // form submit
+  // ----- Sanitização numérica: bloqueia letras, permite apenas dígitos e vírgula/ponto decimal -----
+  document.querySelectorAll('[data-numeric="true"]').forEach(el=>{
+    el.addEventListener('input', ()=>{
+      const cursor = el.selectionStart;
+      const before = el.value;
+      let cleaned = el.value.replace(/[^0-9.,]/g, '');
+      const firstSep = cleaned.search(/[.,]/);
+      if(firstSep !== -1){
+        cleaned = cleaned.slice(0, firstSep+1) + cleaned.slice(firstSep+1).replace(/[.,]/g, '');
+      }
+      if(cleaned !== before){
+        el.value = cleaned;
+        const diff = before.length - cleaned.length;
+        if(cursor != null) el.setSelectionRange(Math.max(0,cursor-diff), Math.max(0,cursor-diff));
+      }
+    });
+  });
+
+  function toNum(str){
+    if(str===undefined || str===null || str==='') return NaN;
+    return parseFloat(String(str).replace(',', '.'));
+  }
+
+  // ----- Toggle das faixas de especificação (mín/máx) -----
+  document.querySelectorAll('[data-spec-toggle]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const key = btn.getAttribute('data-spec-toggle');
+      const row = document.querySelector(`[data-spec-row="${key}"]`);
+      row.classList.toggle('open');
+      btn.textContent = row.classList.contains('open') ? '– ocultar faixa' : '+ definir faixa aceitável';
+    });
+  });
+
+  // ----- Mostra/esconde seções extras conforme o tipo de amostragem -----
+  const tipoSelect = document.getElementById('tipoAmostragem');
+  function updateExtraSections(){
+    document.querySelectorAll('.extra-section').forEach(sec=>{
+      sec.classList.toggle('open', sec.getAttribute('data-extra')===tipoSelect.value);
+    });
+  }
+  tipoSelect.addEventListener('change', updateExtraSections);
+  updateExtraSections();
+
+  // ----- Validação automática de desvio contra faixas de especificação -----
+  function getSpec(key){
+    const minEl = document.querySelector(`[data-spec="${key}-min"]`);
+    const maxEl = document.querySelector(`[data-spec="${key}-max"]`);
+    return { min: minEl ? toNum(minEl.value) : NaN, max: maxEl ? toNum(maxEl.value) : NaN };
+  }
+
+  function checkOne(valueFieldId, specKey, label, unit, devMsgId){
+    const el = document.getElementById(valueFieldId);
+    const val = toNum(el.value);
+    const {min, max} = getSpec(specKey);
+    const devEl = document.getElementById(devMsgId);
+    if(isNaN(val) || (isNaN(min) && isNaN(max))){
+      if(devEl){ devEl.classList.remove('show'); devEl.textContent=''; }
+      return null;
+    }
+    let out = false, msg = '';
+    if(!isNaN(min) && val < min){ out = true; msg = `⚠ ${label}: ${el.value}${unit} abaixo do mínimo (${min}${unit})`; }
+    if(!isNaN(max) && val > max){ out = true; msg = `⚠ ${label}: ${el.value}${unit} acima do máximo (${max}${unit})`; }
+    if(devEl){
+      devEl.textContent = out ? msg : '';
+      devEl.classList.toggle('show', out);
+    }
+    return out ? msg : null;
+  }
+
+  function runValidations(){
+    const alerts = [];
+    const checks = [
+      ['formatoLargura','formatoLargura','Formato (largura)','mm','dev-formato'],
+      ['formatoAltura','formatoAltura','Formato (altura)','mm','dev-formato'],
+      ['diametro','diametro','Diâmetro','mm','dev-diametro'],
+      ['gramatura','gramatura','Gramatura','g/m²','dev-gramatura'],
+      ['umidade','umidade','Umidade','%','dev-umidade'],
+      ['espParede','espParede','Espessura da parede','mm','dev-espParede'],
+      ['diamExterno','diamExterno','Diâmetro externo','mm','dev-diamExterno'],
+      ['diamInterno','diamInterno','Diâmetro interno','mm','dev-diamInterno'],
+      ['compressao','compressao','Compressão','kgf','dev-compressao'],
+      ['comprimento','comprimento','Comprimento','mm','dev-comprimento'],
+    ];
+    // formato usa a mesma mensagem de desvio pros dois campos, então tratamos junto
+    let formatoMsgs = [];
+    checks.forEach(([fieldId, specKey, label, unit, devMsgId])=>{
+      const el = document.getElementById(fieldId);
+      if(!el) return;
+      if(fieldId==='formatoLargura' || fieldId==='formatoAltura'){
+        const val = toNum(el.value);
+        const {min,max} = getSpec(specKey);
+        if(!isNaN(val) && (!isNaN(min)||!isNaN(max))){
+          if(!isNaN(min) && val<min) formatoMsgs.push(`⚠ ${label}: ${el.value}mm abaixo do mínimo (${min}mm)`);
+          if(!isNaN(max) && val>max) formatoMsgs.push(`⚠ ${label}: ${el.value}mm acima do máximo (${max}mm)`);
+        }
+        return;
+      }
+      const msg = checkOne(fieldId, specKey, label, unit, devMsgId);
+      if(msg) alerts.push(msg);
+    });
+    const devFormatoEl = document.getElementById('dev-formato');
+    if(devFormatoEl){
+      devFormatoEl.textContent = formatoMsgs.join(' · ');
+      devFormatoEl.classList.toggle('show', formatoMsgs.length>0);
+    }
+    alerts.push(...formatoMsgs);
+
+    const alertsBox = document.getElementById('alertsBox');
+    const alertsList = document.getElementById('alertsList');
+    if(alerts.length>0){
+      alertsList.innerHTML = alerts.map(a=>`<li>${a}</li>`).join('');
+      alertsBox.classList.add('show');
+    } else {
+      alertsList.innerHTML = '';
+      alertsBox.classList.remove('show');
+    }
+    return alerts;
+  }
+
+  document.querySelectorAll('#apontamentoForm [data-numeric="true"]').forEach(el=>{
+    el.addEventListener('input', runValidations);
+  });
+
+  document.getElementById('apontamentoForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    const alerts = runValidations();
+    const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    let status = document.querySelector('input[name="status"]:checked').value;
+    let desvioEncontrado = val('desvioEncontrado');
+    if(alerts.length>0){
+      status = 'Reprovado';
+      if(!desvioEncontrado) desvioEncontrado = alerts.map(a=>a.replace('⚠ ','')).join('; ');
+    }
+    const rec = {
+      id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+      criadoEm: new Date().toISOString(),
+      cliente: val('cliente'),
+      numeroOP: val('numeroOP'),
+      contagemOP: val('contagemOP'),
+      tipoAmostragem: val('tipoAmostragem'),
+      produto: val('produto'),
+      maquina: document.getElementById('maquina').value,
+      lote: val('lote'),
+      numeroPallet: val('numeroPallet'),
+      inicioMeioFim: document.getElementById('inicioMeioFim').value,
+      turno: document.getElementById('turno').value,
+      inspetor: val('inspetor'),
+      qtdPedido: val('qtdPedido'),
+      qtdAvaliar: val('qtdAvaliar'),
+      qtdAvaliada: val('qtdAvaliada'),
+      liberado: document.getElementById('liberado').value,
+      formatoLargura: val('formatoLargura'),
+      formatoAltura: val('formatoAltura'),
+      formato: [val('formatoLargura'), val('formatoAltura')].filter(Boolean).join(' × '),
+      diametro: val('diametro'),
+      gramatura: val('gramatura'),
+      espessura: val('espessura'),
+      brilho: val('brilho'),
+      polegadas: val('polegadas'),
+      umidade: val('umidade'),
+      espParede: val('espParede'),
+      diamExterno: val('diamExterno'),
+      diamInterno: val('diamInterno'),
+      compressao: val('compressao'),
+      comprimento: val('comprimento'),
+      direcaoFilme: val('direcaoFilme'),
+      cobb: val('cobb'),
+      unidadeCobb: val('unidadeCobb'),
+      colagem: val('colagem'),
+      embalagem: val('embalagem'),
+      contOp: val('contOp'),
+      contCondicao: val('contCondicao'),
+      desvioAutomatico: alerts.length>0,
+      desvioEncontrado: desvioEncontrado,
+      status: status,
+      observacoes: val('observacoes'),
+    };
+    records.push(rec);
+    await persist();
+    let excelMessage = '';
+    if(qualityWorkbook){
+      try{
+        await appendToQualityWorkbook(rec);
+        excelMessage = ' Planilha da Qualidade atualizada.';
+      }catch(err){
+        console.error('Erro ao atualizar planilha da Qualidade',err);
+        excelMessage = ' Registro salvo no site, mas não foi possível atualizar a planilha.';
+        setExcelStatus(excelMessage.trim());
+      }
+    }else{
+      excelMessage = ' Conecte a planilha da Qualidade para enviar este registro ao Excel.';
+    }
+    renderAll();
+    document.getElementById('saveMsg').textContent = alerts.length>0
+      ? 'Desvio detectado — registrado automaticamente como Reprovado.' + excelMessage
+      : 'Apontamento registrado com sucesso.' + excelMessage;
+    e.target.reset();
+    document.getElementById('turno').value = currentShiftGuess();
+    document.getElementById('inspetor').value = loggedUser.name;
+    updateExtraSections();
+    runValidations();
+    btn.disabled = false;
+    setTimeout(()=>{ document.getElementById('saveMsg').textContent=''; }, 4000);
+  });
+
+  // filters
+  ['filterTurno','filterStatus','filterProduto'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', renderTable);
+    document.getElementById(id).addEventListener('change', renderTable);
+  });
+
+  // export XLSX (arquivo Excel real — colunas sempre separadas, sem depender de config regional de CSV)
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    if(records.length===0){ alert('Não há registros para exportar ainda.'); return; }
+    try{
+      const sorted = [...records].sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm));
+      const header = [
+        'Data','Hora','Inspetor','Turno','Máquina','Cliente','Nº OP','Contagem de OP','Tipo de amostragem','Produto','Lote','Número do pallet','Início/meio/fim',
+        'Qtd. pedido','Qtd. a avaliar','Qtd. avaliada','Liberado',
+        'Formato (mm)','Diâmetro (mm)','Gramatura (g/m²)','Espessura (mm)','Brilho (GU)',
+        'Polegadas','Umidade (%)','Espessura parede (mm)','Diâmetro externo (mm)','Diâmetro interno (mm)','Compressão (kgf)','Comprimento (mm)',
+        'Direção do filme','Cobb','Unidade (Cobb)','Colagem (Laminado)','Embalagem','Cont. OP','Cont. Condição',
+        'Desvio automático?','Desvio encontrado','Aprovado/Reprovado','Observações'
+      ];
+      const rows = sorted.map(r=>{
+        const d = new Date(r.criadoEm);
+        return [
+          d.toLocaleDateString('pt-BR'),
+          d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
+          r.inspetor, r.turno, r.maquina, r.cliente||'', r.numeroOP||'', r.contagemOP||'', r.tipoAmostragem||'', r.produto, r.lote, r.numeroPallet||'', r.inicioMeioFim||'',
+          r.qtdPedido||'', r.qtdAvaliar||'', r.qtdAvaliada||'', r.liberado||'',
+          r.formato||'', r.diametro||'', r.gramatura||'', r.espessura||'', r.brilho||'',
+          r.polegadas||'', r.umidade||'', r.espParede||'', r.diamExterno||'', r.diamInterno||'', r.compressao||'', r.comprimento||'',
+          r.direcaoFilme||'', r.cobb||'', r.unidadeCobb||'', r.colagem||'', r.embalagem||'', r.contOp||'', r.contCondicao||'',
+          r.desvioAutomatico ? 'Sim' : 'Não', r.desvioEncontrado||'', r.status, r.observacoes||''
+        ];
+      });
+      const wsData = [header, ...rows];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      // largura das colunas para ficar legível ao abrir
+      ws['!cols'] = header.map(h => ({ wch: Math.max(12, Math.min(24, h.length+4)) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Apontamentos');
+      XLSX.writeFile(wb, 'forest_paper_apontamentos.xlsx');
+    }catch(err){
+      console.error('Erro ao exportar', err);
+      alert('Não foi possível gerar o arquivo Excel agora. Tente novamente.');
+    }
+  });
+
+  // reset
+  document.getElementById('resetBtn').addEventListener('click', async ()=>{
+    if(!confirm('Isso vai apagar todos os apontamentos registrados para todo o time. Confirmar?')) return;
+    records = [];
+    await persist();
+    renderAll();
+  });
+
+  // produção: importação da planilha exportada pelo ERP
+  document.getElementById('importOrdersExcelBtn').addEventListener('click',()=>{
+    document.getElementById('ordersExcelInput').click();
+  });
+  document.getElementById('ordersExcelInput').addEventListener('change',async event=>{
+    const file = event.target.files && event.target.files[0];
+    if(file) await importOrdersWorkbook(file);
+    event.target.value = '';
+  });
+  document.getElementById('orderSearch').addEventListener('input',renderPedidos);
+
+  // produção: solicita uma sincronização imediata do Excel corporativo e recarrega o D1
+  document.getElementById('syncOrdersBtn').addEventListener('click', async (event)=>{
+    event.currentTarget.disabled = true;
+    setSyncStatus('Solicitando atualização do Excel...', true);
+    try{
+      const response = await fetch(`${APP_CONFIG.apiBaseUrl}/sync`, {
+        method:'POST', credentials:'same-origin', headers:{'Accept':'application/json'}
+      });
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+      await syncOrdersFromProtheus(false);
+      alert(`Sincronização concluída: ${payload.received || 0} linha(s) lida(s), ${payload.changed || 0} registro(s) alterado(s).`);
+    }catch(err){
+      setSyncStatus('Não foi possível sincronizar agora', false);
+      alert(`Falha na sincronização: ${err.message}`);
+    }finally{
+      event.currentTarget.disabled = false;
+    }
+  });
+
+  // produção: adicionar máquina/cantoneira
+  document.getElementById('addMachineBtn').addEventListener('click', async ()=>{
+    const input = document.getElementById('newMachineInput');
+    const nome = input.value.trim();
+    if(!nome) return;
+    if(!maquinas.includes(nome)) maquinas.push(nome);
+    input.value = '';
+    await persistMaquinas();
+    renderMachineChips();
+    renderPedidos();
+  });
+
+  // init
+  document.getElementById('turno').value = currentShiftGuess();
+  await loadRecords();
+  await loadPedidos();
+  await loadMaquinas();
+  loadingBox.style.display = 'none';
+  appBody.style.display = 'block';
+  renderAll();
+  renderPedidos();
+  renderFilaQualidade();
+  renderMachineChips();
+  renderDashboardProducao();
+
+  // sincronização periódica do fluxo Produção → Qualidade → Cliente
+  setInterval(()=>syncOrdersFromProtheus(false), APP_CONFIG.syncIntervalMs);
+  } // fim startApp
+})();
+</script>
+
+</body>
+</html>

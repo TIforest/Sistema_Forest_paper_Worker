@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "producao-forest-paper",
+  "main": "./src/worker.js",
+  "compatibility_date": "2026-07-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "forest-paper-producao",
+      "database_id": "6a60f78d-05d1-4a00-a26f-c860da0fe473",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "SYNC_MAX_ROWS": "5000",
+    "SYNC_LOOKBACK_DAYS": "120",
+    "TOTVS_BASE_URL": "https://forestpaper145392.protheus.cloudtotvs.com.br:1857/rest",
+    "TOTVS_PAGE_SIZE": "200",
+    "COMMERCIAL_SYNC_MAX_ROWS": "10000",
+    "COMMERCIAL_LOOKBACK_DAYS": "400",
+    "ACCESS_TEAM_DOMAIN": "ancient-star-2672.cloudflareaccess.com",
+    "QUALITY_GROUP_IDS": "3a81b71f-fe71-450c-ba06-0794a2f1394a,f36ff687-2999-4989-9d4b-af885c245e17"
+  },
+  "triggers": {
+    "crons": ["*/30 * * * *"]
+  }
+}

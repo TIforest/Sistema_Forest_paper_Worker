@@ -1,0 +1,28 @@
+name: Validar site
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Ativar pnpm
+        run: corepack enable
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+      - name: Verificar dados sensiveis e gerar site
+        run: pnpm run build
+      - name: Validar Worker sem publicar
+        run: pnpm exec wrangler deploy --dry-run

@@ -1,0 +1,26 @@
+{
+  "name": "forest-paper-producao-qualidade",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Portal interno Forest Paper com Cloudflare Workers, D1 e integracao TOTVS Protheus",
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "check": "node scripts/build.mjs --check",
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && wrangler dev",
+    "db:create": "wrangler d1 create forest-paper-producao",
+    "db:migrate:local": "wrangler d1 migrations apply forest-paper-producao --local",
+    "db:migrate:remote": "wrangler d1 migrations apply forest-paper-producao --remote",
+    "deploy": "npm run build && wrangler deploy",
+    "user:sql": "node scripts/provision-user.mjs"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
