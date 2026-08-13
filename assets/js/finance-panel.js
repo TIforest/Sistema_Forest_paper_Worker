@@ -36,10 +36,10 @@ function styles() {
   `;
   document.head.appendChild(style);
 }
-function shell() {
+function shell(user) {
   rootElement.innerHTML = `
     <div class="fin">
-      <header class="fin-hero"><div><div class="fin-eyebrow">Financeiro · Protheus SE2 / SC7</div><h2>Contas a Pagar</h2><p>Títulos em aberto, disponibilidade financeira e compromissos dos próximos dias.</p></div><div class="fin-sync">Última atualização<strong id="finUpdated">Aguardando cache</strong></div></header>
+      <header class="fin-hero"><div><div class="fin-eyebrow">Financeiro · Protheus SE2 / SC7</div><h2>Contas a Pagar</h2><p>Títulos em aberto, disponibilidade financeira e compromissos dos próximos dias.</p></div><div class="fin-sync">Última atualização<strong id="finUpdated">Aguardando cache</strong>${user.role === "admin" ? '<button class="fin-button" id="finSyncNow" type="button">Sincronizar Protheus</button><small id="finSyncStatus" aria-live="polite"></small>' : ""}</div></header>
       <section class="fin-kpis" id="finKpis"></section>
       <section class="fin-alerts" id="finAlerts"></section>
       <nav class="fin-tabs" aria-label="Visões financeiras"><button class="fin-tab primary active" data-fin-view="payables">Contas a Pagar</button><button class="fin-tab" data-fin-view="settled">Títulos Baixados</button><button class="fin-tab" data-fin-view="purchases">Pedidos de Compra</button><button class="fin-tab" data-fin-view="balances">Saldo de Contas</button></nav>
@@ -49,6 +49,22 @@ function shell() {
     rootElement.querySelectorAll("[data-fin-view]").forEach((item) => item.classList.remove("active"));
     button.classList.add("active"); currentView = button.dataset.finView; currentPage = 1; await loadView();
   }));
+  document.getElementById("finSyncNow")?.addEventListener("click", syncNow);
+}
+async function syncNow() {
+  const button = document.getElementById("finSyncNow");
+  const status = document.getElementById("finSyncStatus");
+  button.disabled = true;
+  status.textContent = "Consultando SE2 e SC7...";
+  try {
+    const result = await request("/sync", { method: "POST" });
+    status.textContent = `Concluído: ${result.payables || 0} título(s) e ${result.purchases || 0} pedido(s).`;
+    await Promise.all([loadDashboard(), loadView()]);
+  } catch (error) {
+    status.textContent = `Falha: ${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
 }
 function kpis(data) {
   document.getElementById("finUpdated").textContent = data.lastSync?.finished_at ? new Date(data.lastSync.finished_at).toLocaleString("pt-BR") : "Ainda não sincronizado";
@@ -129,8 +145,10 @@ export async function mountFinancePanel(root) {
   if (root.dataset.mounted === "true") return;
   root.dataset.mounted = "true"; rootElement = root; styles();
   try {
-    const feature = await request("/feature");
+    const [feature, userResponse] = await Promise.all([request("/feature"), fetch("/api/me", { credentials: "same-origin", headers: { Accept: "application/json" } })]);
+    const user = await userResponse.json().catch(() => ({}));
+    if (!userResponse.ok) throw new Error(user.message || user.error || `HTTP ${userResponse.status}`);
     if (!feature.enabled) { root.innerHTML = `<div class="fin fin-disabled"><section class="fin-panel"><span class="fin-badge">Feature flag desativada</span><h2>Painel Financeiro em homologação</h2><p>A estrutura está instalada, mas a sincronização SE2/SC7 permanece desligada até validar os campos da API TOTVS.</p><button class="fin-button primary" id="finEnable">Habilitar para homologação</button></section></div>`; document.getElementById("finEnable").addEventListener("click", async () => { await request("/feature", { method: "PUT", body: JSON.stringify({ enabled: true }) }); root.dataset.mounted = "false"; await mountFinancePanel(root); }); return; }
-    shell(); await Promise.all([loadDashboard(), loadView()]);
+    shell(user); await Promise.all([loadDashboard(), loadView()]);
   } catch(error) { root.innerHTML = `<div class="fin"><div class="fin-error">Não foi possível abrir o painel financeiro: ${escapeHtml(error.message)}</div></div>`; }
 }

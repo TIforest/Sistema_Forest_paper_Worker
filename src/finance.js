@@ -278,7 +278,7 @@ export async function handleFinanceRequest(request, env, user) {
       response = json(view === "settled" ? await listPayables(env, url, true, true) : view === "purchases" ? await listPurchases(env, url, true) : await listPayables(env, url, false, true));
     } else if (url.pathname === "/api/finance/balances" && ["GET", "PUT"].includes(request.method)) response = await balances(request, env, user, url);
     else if (url.pathname.startsWith("/api/finance/status/") && request.method === "PUT") response = await saveStatus(request, env, user, decodeURIComponent(url.pathname.slice("/api/finance/status/".length)));
-    else if (url.pathname === "/api/finance/sync" && request.method === "POST" && user.role === "admin") response = json(await syncFinanceCache(env, user));
+    else if (url.pathname === "/api/finance/sync" && request.method === "POST") response = user.role === "admin" ? json(await syncFinanceCache(env, user)) : json({ error: "forbidden", message: "Somente administradores podem sincronizar o Protheus." }, 403);
     else response = json({ error: "not_found" }, 404);
     console.log(JSON.stringify({ event: "finance_endpoint", path: url.pathname, method: request.method, status: response.status, durationMs: Date.now() - started }));
     return response;
