@@ -77,7 +77,9 @@ async function requestPage(env, url) {
   return payload;
 }
 async function fetchAll(env, buildUrl) {
-  const pageSize = positiveInteger(env.FINANCE_PAGE_SIZE, 200, 200);
+  // A pagina maior reduz as chamadas externas e mantém a sincronização dentro
+  // do limite de sub-requisições do plano gratuito do Workers.
+  const pageSize = positiveInteger(env.FINANCE_PAGE_SIZE, 1000, 1000);
   const maxRows = positiveInteger(env.FINANCE_SYNC_MAX_ROWS, 20000, 50000);
   const rows = [];
   let page = 1;

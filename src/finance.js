@@ -39,9 +39,11 @@ async function hashRecord(record) { return sha256(JSON.stringify(record)); }
 
 async function upsertPayables(env, records, syncAt) {
   let changed = 0;
-  for (let offset = 0; offset < records.length; offset += 50) {
+  // D1.batch representa uma única sub-requisição interna; agrupar mais linhas
+  // evita esgotar o limite do Worker durante cargas anuais do Protheus.
+  for (let offset = 0; offset < records.length; offset += 500) {
     const statements = [];
-    for (const row of records.slice(offset, offset + 50)) {
+    for (const row of records.slice(offset, offset + 500)) {
       const hash = await hashRecord(row);
       statements.push(env.DB.prepare(`
         INSERT INTO finance_payables_cache (
@@ -72,9 +74,9 @@ async function upsertPayables(env, records, syncAt) {
 
 async function upsertPurchases(env, records, syncAt) {
   let changed = 0;
-  for (let offset = 0; offset < records.length; offset += 50) {
+  for (let offset = 0; offset < records.length; offset += 500) {
     const statements = [];
-    for (const row of records.slice(offset, offset + 50)) {
+    for (const row of records.slice(offset, offset + 500)) {
       const hash = await hashRecord(row);
       statements.push(env.DB.prepare(`
         INSERT INTO finance_purchase_orders_cache (
