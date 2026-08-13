@@ -1,7 +1,8 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "producao-forest-paper-finance-staging",
-  "workers_dev": false,
+  "workers_dev": true,
+  "preview_urls": false,
   "main": "./src/worker.js",
   "compatibility_date": "2026-07-17",
   "compatibility_flags": ["nodejs_compat"],
