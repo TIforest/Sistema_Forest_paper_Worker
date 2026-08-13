@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { handleCommercialRequest, syncCommercialBilling } from "./commercial.js";
 import { handleFinanceRequest, syncFinanceCache } from "./finance.js";
 
 const JSON_HEADERS = {
@@ -419,6 +420,10 @@ async function api(request, env) {
     return handleFinanceRequest(request, env, user);
   }
 
+  if (url.pathname === "/api/commercial" || url.pathname.startsWith("/api/commercial/")) {
+    return handleCommercialRequest(request, env, user);
+  }
+
   if (url.pathname === "/api/me" && request.method === "GET") {
     return json({ name: user.name, role: user.role });
   }
@@ -498,6 +503,19 @@ export default {
       ctx.waitUntil(syncFinanceCache(env));
       return;
     }
-    ctx.waitUntil(syncFromMicrosoft(env));
+    if (controller.cron === "*/30 * * * *") {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Sao_Paulo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date());
+      const period = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      const day = `${period.year}-${period.month}-${period.day}`;
+      // A consulta diária evita os timeouts 522 observados no Protheus ao
+      // reler o mês inteiro a cada meia hora. Os dias anteriores permanecem no D1.
+      ctx.waitUntil(syncCommercialBilling(env, null, { month: day.slice(0, 7), day }));
+      return;
+    }
   },
 };
