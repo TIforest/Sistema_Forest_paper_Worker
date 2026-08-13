@@ -2,6 +2,7 @@
   "name": "forest-paper-producao-qualidade",
   "version": "2.0.0",
   "private": true,
+  "type": "module",
   "description": "Portal interno Forest Paper com Cloudflare Workers, D1 e integracao TOTVS Protheus",
   "packageManager": "pnpm@11.9.0",
   "scripts": {
@@ -12,6 +13,10 @@
     "db:migrate:local": "wrangler d1 migrations apply forest-paper-producao --local",
     "db:migrate:remote": "wrangler d1 migrations apply forest-paper-producao --remote",
     "deploy": "npm run build && wrangler deploy",
+    "deploy:finance:staging": "npm run build && wrangler deploy --config wrangler.staging.jsonc",
+    "db:finance:staging": "wrangler d1 migrations apply forest-paper-finance-staging --remote --config wrangler.staging.jsonc",
+    "test:finance": "node scripts/test-finance-query.mjs",
+    "test:finance:live": "node scripts/test-finance-live.mjs",
     "user:sql": "node scripts/provision-user.mjs"
   },
   "dependencies": {

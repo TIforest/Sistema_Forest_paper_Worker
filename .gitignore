@@ -22,6 +22,8 @@ dist/
 node_modules/
 .wrangler/
 .wrangler-dry-run/
+.wrangler-dry-run-finance/
+.wrangler-finance-test/
 .codex-workers-types/
 *.log
 *.bak

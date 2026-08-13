@@ -75,6 +75,7 @@
   .tab-btn[data-tab="operadores"] .tab-icon{background:#FFD77D;}
   .tab-btn[data-tab="turnos"] .tab-icon{background:#BDE8D1;}
   .tab-btn[data-tab="comercial"] .tab-icon{background:#BFD8FF;}
+  .tab-btn[data-tab="financeiro"] .tab-icon{background:#C5F249;}
   .tab-btn[data-tab="diretoria"] .tab-icon{background:#E0D3C1;}
   .tab-label{display:block;line-height:1.3;overflow:hidden;text-overflow:ellipsis;}
   .tab-panel{display:none;}
@@ -780,6 +781,7 @@
     <button class="tab-btn" data-tab="operadores"><span class="tab-icon"><img src="/assets/icon-operadores.png" alt=""></span><span class="tab-label">Operadores</span></button>
     <button class="tab-btn" data-tab="turnos"><span class="tab-icon"><img src="/assets/icon-turnos.png" alt=""></span><span class="tab-label">Turnos</span></button>
     <button class="tab-btn" data-tab="comercial"><span class="tab-icon"><img src="/assets/icon-comercial.png" alt=""></span><span class="tab-label">Gestão<br>Comercial</span></button>
+    <button class="tab-btn" data-tab="financeiro"><span class="tab-icon">R$</span><span class="tab-label">Contas<br>a Pagar</span></button>
     <button class="tab-btn" data-tab="diretoria"><span class="tab-icon icon-wide"><img src="/assets/icon-diretoria.png" alt=""></span><span class="tab-label">Diretoria<br>Dashboard</span></button>
   </div>
 
@@ -1384,6 +1386,9 @@
       </div>
     </div>
 
+    <!-- Módulo financeiro carregado sob demanda. -->
+    <div class="tab-panel" id="tab-financeiro"><div id="financeModuleRoot" aria-live="polite"></div></div>
+
   </div>
 </div>
 </div><!-- /mainApp -->
@@ -1688,7 +1693,7 @@
 
   // exibe o usuário logado na topbar
   const userChip = document.getElementById('userChip');
-  const roleLabel = loggedUser.role === 'admin' ? 'Administrador' : loggedUser.role === 'producao' ? 'Produção' : loggedUser.role === 'diretoria' ? 'Diretoria' : loggedUser.role === 'comercial' ? 'Comercial' : 'Qualidade';
+  const roleLabel = loggedUser.role === 'admin' ? 'Administrador' : loggedUser.role === 'producao' ? 'Produção' : loggedUser.role === 'diretoria' ? 'Diretoria' : loggedUser.role === 'comercial' ? 'Comercial' : loggedUser.role === 'financeiro' ? 'Financeiro' : 'Qualidade';
   userChip.innerHTML = `<div class="avatar">${initials(loggedUser.name)}</div><span>${loggedUser.name}</span><span class="role-badge">${roleLabel}</span><button id="logoutBtn">Sair</button>`;
   document.getElementById('logoutBtn').addEventListener('click', async ()=>{
     sessionStorage.clear();
@@ -1705,13 +1710,16 @@
     const isProduction = loggedUser.role === 'producao';
     const isDirector = loggedUser.role === 'diretoria';
     const isCommercial = loggedUser.role === 'comercial';
+    const isFinance = loggedUser.role === 'financeiro';
     document.querySelectorAll('.tab-btn').forEach(btn=>{
       const allowed = isAdmin
         ? true
         : isProduction
         ? ['producao','turnos'].includes(btn.dataset.tab)
         : isDirector
-          ? ['comercial','diretoria','turnos'].includes(btn.dataset.tab)
+          ? ['comercial','diretoria','turnos','financeiro'].includes(btn.dataset.tab)
+          : isFinance
+            ? ['financeiro'].includes(btn.dataset.tab)
           : isCommercial
             ? ['comercial'].includes(btn.dataset.tab)
           : ['qualidade','apontamento','painel','turnos'].includes(btn.dataset.tab);
@@ -1719,7 +1727,7 @@
       btn.classList.remove('active');
     });
     document.querySelectorAll('.tab-panel').forEach(panel=>panel.classList.remove('active'));
-    const firstTab = isAdmin ? 'painel' : isProduction ? 'producao' : isDirector ? 'diretoria' : isCommercial ? 'comercial' : 'qualidade';
+    const firstTab = isAdmin ? 'painel' : isProduction ? 'producao' : isDirector ? 'diretoria' : isFinance ? 'financeiro' : isCommercial ? 'comercial' : 'qualidade';
     document.querySelector(`.tab-btn[data-tab="${firstTab}"]`).classList.add('active');
     document.getElementById(`tab-${firstTab}`).classList.add('active');
     document.getElementById('kpiRow').style.display = firstTab==='painel' && ['qualidade','admin'].includes(loggedUser.role) ? '' : 'none';
@@ -1728,6 +1736,7 @@
     document.getElementById('ordersSyncPanel').hidden = !isAdmin;
     document.getElementById('stationShiftBox').hidden = isAdmin;
     document.getElementById('commercialSyncBtn').hidden = !isAdmin;
+    if(firstTab === 'financeiro') loadFinanceModule();
   }
   configureAccess();
 
@@ -3485,8 +3494,14 @@
   }
 
   // tabs
+  let financeModulePromise = null;
+  async function loadFinanceModule(){
+    if(!financeModulePromise) financeModulePromise = import('/assets/js/finance-panel.js').then(module=>module.mountFinancePanel(document.getElementById('financeModuleRoot')));
+    try{ await financeModulePromise; }
+    catch(error){ document.getElementById('financeModuleRoot').innerHTML=`<div class="panel-box"><h3>Painel financeiro indisponível</h3><p>${escapeHtml(error.message||String(error))}</p></div>`; }
+  }
   document.querySelectorAll('.tab-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', async ()=>{
       document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
       btn.classList.add('active');
@@ -3495,6 +3510,7 @@
       if(btn.dataset.tab==='turnos') renderShiftMetrics();
       if(btn.dataset.tab==='operadores') renderOperators();
       if(btn.dataset.tab==='comercial' && !commercialLoaded) loadCommercialData();
+      if(btn.dataset.tab==='financeiro') await loadFinanceModule();
       queueUiStateSave();
     });
   });

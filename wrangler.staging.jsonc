@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "producao-forest-paper",
+  "name": "producao-forest-paper-finance-staging",
+  "workers_dev": false,
   "main": "./src/worker.js",
   "compatibility_date": "2026-07-17",
   "compatibility_flags": ["nodejs_compat"],
@@ -13,13 +14,13 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "forest-paper-producao",
-      "database_id": "6a60f78d-05d1-4a00-a26f-c860da0fe473",
+      "database_name": "forest-paper-finance-staging",
+      "database_id": "91217781-9c99-457b-88a4-f8d9e78311a1",
       "migrations_dir": "migrations"
     }
   ],
   "vars": {
-    "ENVIRONMENT": "production",
+    "ENVIRONMENT": "staging",
     "SYNC_MAX_ROWS": "5000",
     "SYNC_LOOKBACK_DAYS": "120",
     "TOTVS_BASE_URL": "https://forestpaper145392.protheus.cloudtotvs.com.br:1857/rest",
@@ -27,14 +28,14 @@
     "COMMERCIAL_SYNC_MAX_ROWS": "10000",
     "COMMERCIAL_LOOKBACK_DAYS": "400",
     "ACCESS_TEAM_DOMAIN": "ancient-star-2672.cloudflareaccess.com",
-    "QUALITY_GROUP_IDS": "3a81b71f-fe71-450c-ba06-0794a2f1394a,f36ff687-2999-4989-9d4b-af885c245e17"
-    ,"FINANCE_PAGE_SIZE": "200"
-    ,"FINANCE_SYNC_MAX_ROWS": "20000"
-    ,"FINANCE_SE2_ACTUAL_DUE_FIELD": "E2_VENCREA"
-    ,"FINANCE_SE2_BALANCE_FIELD": "E2_SALDO"
-    ,"FINANCE_SC7_RECEIVED_QTY_FIELD": "C7_QUJE"
+    "QUALITY_GROUP_IDS": "3a81b71f-fe71-450c-ba06-0794a2f1394a,f36ff687-2999-4989-9d4b-af885c245e17",
+    "FINANCE_PAGE_SIZE": "200",
+    "FINANCE_SYNC_MAX_ROWS": "20000",
+    "FINANCE_SE2_ACTUAL_DUE_FIELD": "E2_VENCREA",
+    "FINANCE_SE2_BALANCE_FIELD": "E2_SALDO",
+    "FINANCE_SC7_RECEIVED_QTY_FIELD": "C7_QUJE"
   },
   "triggers": {
-    "crons": ["*/15 * * * *", "*/30 * * * *"]
+    "crons": ["*/15 * * * *"]
   }
 }

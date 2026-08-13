@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { handleFinanceRequest, syncFinanceCache } from "./finance.js";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -414,6 +415,10 @@ async function api(request, env) {
   if (auth.response) return auth.response;
   const { user } = auth;
 
+  if (url.pathname.startsWith("/api/finance/")) {
+    return handleFinanceRequest(request, env, user);
+  }
+
   if (url.pathname === "/api/me" && request.method === "GET") {
     return json({ name: user.name, role: user.role });
   }
@@ -488,7 +493,11 @@ export default {
     return env.ASSETS.fetch(request);
   },
 
-  async scheduled(_controller, env, ctx) {
+  async scheduled(controller, env, ctx) {
+    if (controller.cron === "*/15 * * * *") {
+      ctx.waitUntil(syncFinanceCache(env));
+      return;
+    }
     ctx.waitUntil(syncFromMicrosoft(env));
   },
 };

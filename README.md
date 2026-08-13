@@ -1,117 +1,104 @@
-# Forest Paper — Produção, Qualidade e Diretoria
+# Forest Paper — Portal Operacional e Gerencial
 
-Aplicação corporativa preparada para Cloudflare Workers, banco D1, Cloudflare
-Access e sincronização agendada de um Excel armazenado no SharePoint.
+Aplicação corporativa publicada em Cloudflare Workers, com Cloudflare Access,
+banco D1 e integração REST direta com o TOTVS Protheus. A integração principal
+não depende de Microsoft Graph, Excel ou SharePoint; arquivos Excel são apenas
+saídas de relatório ou contingências explícitas.
 
-## Arquitetura
+## Arquitetura atual
 
 1. O site e a API são publicados juntos em um Cloudflare Worker.
-2. O Cloudflare Access autentica a conta corporativa antes do acesso.
+2. O Cloudflare Access autentica a identidade antes do acesso.
 3. A API transforma o e-mail autenticado em SHA-256 e consulta somente o hash
-   no D1. Nenhum e-mail é colocado no HTML ou salvo no banco.
-4. Um Cron Trigger executa a sincronização do Excel a cada três horas.
-5. O Worker baixa o arquivo pelo Microsoft Graph, lê a planilha e atualiza o D1.
-6. Campos do ERP e campos do fluxo de produção/qualidade ficam separados.
+   no D1. Nenhum e-mail é inserido no HTML ou salvo em texto puro no banco.
+4. Jobs agendados consultam o REST GenericQuery do Protheus e atualizam caches D1.
+5. As telas consultam o D1; não consultam o Protheus a cada carregamento.
+6. Produção, Qualidade, Comercial, Diretoria e Financeiro possuem rotas e regras
+   de acesso próprias.
 
 ## Pré-requisitos
 
 - Node.js 20 ou superior.
-- Conta Cloudflare com Workers e D1.
-- Aplicação registrada no Microsoft Entra com permissão de leitura no local do
-  Excel e consentimento do administrador.
-- `PedidodeVenda.xlsx` em uma biblioteca corporativa do SharePoint. Evite
-  depender do OneDrive pessoal de um funcionário.
+- Conta Cloudflare com Workers, D1 e Access.
+- Serviço REST do Protheus disponível por HTTPS.
+- Usuário exclusivo de integração com permissão somente de leitura nos aliases
+  necessários.
 
-## 1. Instalar e validar
+## Instalar e validar
 
 ```powershell
 npm install
 npm run check
+npm run test:finance
 npm run build
 ```
 
-## 2. Criar o banco D1
+## Segredos do Protheus
+
+Nunca coloque credenciais em `wrangler.jsonc`, GitHub, HTML ou documentação.
 
 ```powershell
-npx wrangler login
-npm run db:create
+npx wrangler secret put TOTVS_USER --name producao-forest-paper
+npx wrangler secret put TOTVS_PASSWORD --name producao-forest-paper
 ```
 
-Copie o `database_id` retornado para `wrangler.jsonc`, substituindo o identificador
-provisório `00000000-0000-0000-0000-000000000000`. Depois aplique a estrutura:
+Os mesmos secrets precisam ser cadastrados separadamente em cada Worker de
+homologação. A Cloudflare não permite ler de volta um secret salvo.
+
+## Banco D1
 
 ```powershell
+npm run db:migrate:local
 npm run db:migrate:remote
 ```
 
-## 3. Configurar o caminho do Excel
+Antes de aplicar migrações remotas, confirme no arquivo Wrangler se o nome e o
+`database_id` apontam para o ambiente correto.
 
-Em `wrangler.jsonc`, substitua `GRAPH_FILE_PATH` pelo caminho Microsoft Graph
-do arquivo. Exemplo para uma biblioteca do SharePoint:
-
-```text
-/sites/{site-id}/drives/{drive-id}/root:/Integracoes/PedidodeVenda.xlsx:/content
-```
-
-O Worker procura primeiro uma aba chamada `Consulta1`. Se esse for apenas o
-nome da tabela e a aba possuir outro nome, altere `SYNC_SHEET` para o nome real
-da aba.
-
-## 4. Cadastrar os segredos
-
-Nunca coloque os valores em `wrangler.jsonc`, no GitHub ou no HTML.
-
-```powershell
-npx wrangler secret put MS_TENANT_ID
-npx wrangler secret put MS_CLIENT_ID
-npx wrangler secret put MS_CLIENT_SECRET
-```
-
-## 5. Cadastrar usuários sem armazenar e-mails
-
-Gere o SQL contendo somente o hash da identidade:
+## Cadastrar usuários sem armazenar e-mails
 
 ```powershell
 npm run user:sql -- "usuario@empresa.com" producao "Nome da pessoa"
 ```
 
-Papéis aceitos:
+Papéis disponíveis: `producao`, `qualidade`, `comercial`, `financeiro`,
+`diretoria` e `admin`.
 
-- `producao`: inicia e conclui produção, mantém máquinas e força sincronização.
-- `qualidade`: inicia inspeção, libera ou devolve pedidos e mantém apontamentos.
-- `diretoria`: acesso somente para leitura e consulta da auditoria.
-
-Copie o SQL gerado e execute no D1:
+Copie o SQL gerado e execute no D1 do ambiente correspondente:
 
 ```powershell
 npx wrangler d1 execute forest-paper-producao --remote --command "SQL_GERADO"
 ```
 
-## 6. Publicar
+## Publicação
+
+Produção:
 
 ```powershell
 npm run deploy
 ```
 
-O Cron Trigger `0 */3 * * *` usa UTC e executa a cada três horas.
+Painel Financeiro em homologação:
 
-## 7. Proteger com Cloudflare Access
+```powershell
+npm run db:finance:staging
+npm run deploy:finance:staging
+```
 
-No Cloudflare Zero Trust:
+Não use o comando de produção para homologar o módulo Financeiro. Consulte
+[docs/painel-financeiro-contas-a-pagar.md](docs/painel-financeiro-contas-a-pagar.md)
+para o checklist de liberação.
 
-1. Adicione o Microsoft Entra como provedor de identidade.
-2. Crie uma aplicação Access do tipo Self-hosted para o domínio do portal.
-3. Crie uma política `Allow` apenas para o domínio ou grupo corporativo.
-4. Proteja o domínio principal, o endereço `workers.dev` e eventuais previews.
-5. Teste com um usuário cadastrado e outro não cadastrado.
+## Cloudflare Access
 
-Mesmo que uma política Access seja ampla, a API exige que o hash do usuário
-exista em `user_roles` e esteja ativo.
+Cada hostname publicado deve ter uma aplicação Access própria ou estar coberto
+por uma regra já validada. Uma política Access ampla não substitui o cadastro no
+D1: a API também exige um perfil ativo em `user_roles`.
 
 ## Desenvolvimento local
 
-Copie `.dev.vars.example` para `.dev.vars`, preencha apenas no computador local
-e nunca envie esse arquivo ao Git:
+Copie `.dev.vars.example` para `.dev.vars` e preencha apenas no computador local.
+Esse arquivo nunca deve entrar no Git.
 
 ```powershell
 npm run db:migrate:local
@@ -120,9 +107,8 @@ npm run dev
 
 ## Segurança operacional
 
-- Não envie planilhas, CSVs, credenciais ou `.dev.vars` ao GitHub.
-- Revogue e substitua imediatamente qualquer segredo exposto.
-- Use permissões Microsoft Graph limitadas ao site/biblioteca necessária.
-- Renove o segredo do Entra antes do vencimento.
-- Revise `audit_log` e `sync_runs` em caso de comportamento inesperado.
-- Configure alertas de uso no Cloudflare.
+- Não envie planilhas, CSVs, credenciais, tokens ou `.dev.vars` ao GitHub.
+- Use apenas HTTPS no endpoint do Protheus.
+- Mantenha os usuários de integração com leitura mínima por alias.
+- Revise `audit_log`, `sync_runs` e `finance_sync_runs` diante de falhas.
+- Valide primeiro em staging e promova para produção somente após aprovação.
