@@ -18,6 +18,7 @@ const SALES_ORDER_FIELDS = [
   "C6_NUM",
   "C6_ITEM",
   "C6_PRODUTO",
+  "C6_UM",
   "C6_UNSVEN",
   "C6_QTDVEN",
   "C6_PRCVEN",
@@ -48,6 +49,7 @@ const BILLING_FIELDS = [
   "F2_DTCANC",
   "D2_ITEM",
   "D2_COD",
+  "D2_UM",
   "D2_QUANT",
   "D2_PRCVEN",
   "D2_TOTAL",
@@ -56,6 +58,40 @@ const BILLING_FIELDS = [
   "D2_CF",
   "D2_PEDIDO",
   "D2_ITEMPV",
+];
+
+// Devolucao de venda e nota de ENTRADA: o cliente devolve mercadoria que nos
+// faturamos. No Protheus isso vive em SF1/SD1 com F1_TIPO = 'D' e o vinculo
+// obrigatorio com a nota original em D1_NFORI/D1_SERIORI/D1_ITEMORI.
+// SF1 e usada exclusivamente para devolucoes; o faturamento continua saindo de
+// SF2/SD2, conforme a decisao registrada no HANDOFF_TECNICO.
+const RETURN_FIELDS = [
+  "F1_FILIAL",
+  "F1_DOC",
+  "F1_SERIE",
+  "F1_FORNECE",
+  "F1_LOJA",
+  "F1_EMISSAO",
+  "F1_TIPO",
+  "F1_ESPECIE",
+  "F1_VALBRUT",
+  "F1_VALMERC",
+  "F1_VALIPI",
+  "F1_VALICM",
+  "F1_FRETE",
+  "F1_DTDIGIT",
+  "D1_ITEM",
+  "D1_COD",
+  "D1_UM",
+  "D1_QUANT",
+  "D1_VUNIT",
+  "D1_TOTAL",
+  "D1_TES",
+  "D1_CF",
+  "D1_TIPO",
+  "D1_NFORI",
+  "D1_SERIORI",
+  "D1_ITEMORI",
 ];
 
 function requiredText(value, label) {
@@ -160,6 +196,27 @@ export function buildBillingQueryUrl(env, page, pageSize, now = new Date(), date
     `${notDeleted("SF2")} AND ${notDeleted("SD2")} AND SF2.F2_FILIAL = SD2.D2_FILIAL AND SF2.F2_DOC = SD2.D2_DOC AND SF2.F2_SERIE = SD2.D2_SERIE AND SF2.F2_CLIENTE = SD2.D2_CLIENTE AND SF2.F2_LOJA = SD2.D2_LOJA AND SF2.F2_EMISSAO >= '${from}'${toClause} AND LTRIM(RTRIM(SF2.F2_COND)) <> '32'`,
   );
   url.searchParams.set("order", "F2_EMISSAO DESC,F2_DOC,F2_SERIE,D2_ITEM");
+  url.searchParams.set("filialFilter", "false");
+  url.searchParams.set("deletedFilter", "true");
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("pageSize", String(pageSize));
+  return url;
+}
+
+export function buildReturnsQueryUrl(env, page, pageSize, now = new Date(), dateRange = null) {
+  const lookbackDays = boundedInteger(env.COMMERCIAL_LOOKBACK_DAYS, 400, 1, 3650);
+  const from = dateRange?.from || cutoffProtheusDate(now, lookbackDays);
+  const toClause = dateRange?.to ? ` AND SF1.F1_EMISSAO <= '${dateRange.to}'` : "";
+  const url = genericQueryUrl(env);
+  url.searchParams.set("tables", "SF1,SD1");
+  url.searchParams.set("fields", RETURN_FIELDS.join(","));
+  // Sem filtro de condicao de pagamento: SF1 nao carrega F1_COND de venda, e a
+  // devolucao precisa acompanhar a nota original independentemente da condicao.
+  url.searchParams.set(
+    "where",
+    `${notDeleted("SF1")} AND ${notDeleted("SD1")} AND SF1.F1_FILIAL = SD1.D1_FILIAL AND SF1.F1_DOC = SD1.D1_DOC AND SF1.F1_SERIE = SD1.D1_SERIE AND SF1.F1_FORNECE = SD1.D1_FORNECE AND SF1.F1_LOJA = SD1.D1_LOJA AND LTRIM(RTRIM(SF1.F1_TIPO)) = 'D' AND SF1.F1_EMISSAO >= '${from}'${toClause}`,
+  );
+  url.searchParams.set("order", "F1_EMISSAO DESC,F1_DOC,F1_SERIE,D1_ITEM");
   url.searchParams.set("filialFilter", "false");
   url.searchParams.set("deletedFilter", "true");
   url.searchParams.set("page", String(page));
@@ -289,7 +346,7 @@ async function fetchProductLookups(env, orderRows) {
       env,
       (page) => buildLookupQueryUrl(env, {
         alias: "SB1",
-        fields: ["B1_COD", "B1_DESC"],
+        fields: ["B1_COD", "B1_DESC", "B1_UM"],
         where: `SB1.B1_FILIAL = '' AND SB1.B1_COD IN (${group.map(sqlLiteral).join(",")})`,
         order: "B1_COD",
         page,
@@ -326,7 +383,10 @@ function mergeEnrichment(orderRows, customerRows, productRows, sellerRows, payme
         a1_est: rowValue(customer, "a1_est"),
         a1_cgc: rowValue(customer, "a1_cgc"),
       } : {}),
-      ...(product ? { b1_desc: rowValue(product, "b1_desc") } : {}),
+      ...(product ? {
+        b1_desc: rowValue(product, "b1_desc"),
+        b1_um: rowValue(product, "b1_um"),
+      } : {}),
       ...(seller ? {
         a3_nome: rowValue(seller, "a3_nome"),
         a3_comis: rowValue(seller, "a3_comis"),
@@ -340,10 +400,10 @@ function mergeEnrichment(orderRows, customerRows, productRows, sellerRows, payme
   });
 }
 
-async function fetchBillingCustomerLookups(env, billingRows) {
+async function fetchBillingCustomerLookups(env, billingRows, codeField = "f2_cliente", storeField = "f2_loja") {
   const keys = [...new Map(billingRows.map((row) => {
-    const code = rowValue(row, "f2_cliente");
-    const store = rowValue(row, "f2_loja");
+    const code = rowValue(row, codeField);
+    const store = rowValue(row, storeField);
     return [`${code}\u0000${store}`, { code, store }];
   }).filter(([, value]) => value.code)).values()];
   const combined = { rows: [], pages: 0, protectedDataFields: [], nivelFields: [] };
@@ -372,8 +432,8 @@ async function fetchBillingCustomerLookups(env, billingRows) {
   return combined;
 }
 
-async function fetchBillingProductLookups(env, billingRows) {
-  const codes = [...new Set(billingRows.map((row) => rowValue(row, "d2_cod")).filter(Boolean))];
+async function fetchBillingProductLookups(env, billingRows, codeField = "d2_cod") {
+  const codes = [...new Set(billingRows.map((row) => rowValue(row, codeField)).filter(Boolean))];
   const combined = { rows: [], pages: 0, protectedDataFields: [], nivelFields: [] };
   for (const group of batches(codes, 100)) {
     const pageSize = 200;
@@ -381,7 +441,7 @@ async function fetchBillingProductLookups(env, billingRows) {
       env,
       (page) => buildLookupQueryUrl(env, {
         alias: "SB1",
-        fields: ["B1_COD", "B1_DESC"],
+        fields: ["B1_COD", "B1_DESC", "B1_UM"],
         where: `SB1.B1_FILIAL = '' AND SB1.B1_COD IN (${group.map(sqlLiteral).join(",")})`,
         order: "B1_COD",
         page,
@@ -468,7 +528,10 @@ function mergeBillingEnrichment(billingRows, customerRows, productRows, sellerRo
         a1_est: rowValue(customer, "a1_est"),
         a1_cgc: rowValue(customer, "a1_cgc"),
       } : {}),
-      ...(product ? { b1_desc: rowValue(product, "b1_desc") } : {}),
+      ...(product ? {
+        b1_desc: rowValue(product, "b1_desc"),
+        b1_um: rowValue(product, "b1_um"),
+      } : {}),
       ...(seller ? {
         a3_nome: rowValue(seller, "a3_nome"),
         a3_comis: rowValue(seller, "a3_comis"),
@@ -480,6 +543,69 @@ function mergeBillingEnrichment(billingRows, customerRows, productRows, sellerRo
       } : {}),
     };
   });
+}
+
+function mergeReturnEnrichment(returnRows, customerRows, productRows) {
+  const customers = new Map(customerRows.map((row) => [
+    `${rowValue(row, "a1_cod")}\u0000${rowValue(row, "a1_loja")}`,
+    row,
+  ]));
+  const products = new Map(productRows.map((row) => [rowValue(row, "b1_cod"), row]));
+  return returnRows.map((row) => {
+    // Em devolucao de venda o Protheus grava o CLIENTE em F1_FORNECE, entao o
+    // cadastro correto para enriquecer e a SA1, nao a SA2.
+    const customer = customers.get(`${rowValue(row, "f1_fornece")}\u0000${rowValue(row, "f1_loja")}`);
+    const product = products.get(rowValue(row, "d1_cod"));
+    return {
+      ...row,
+      ...(customer ? {
+        a1_nome: rowValue(customer, "a1_nome"),
+        a1_mun: rowValue(customer, "a1_mun"),
+        a1_est: rowValue(customer, "a1_est"),
+        a1_cgc: rowValue(customer, "a1_cgc"),
+      } : {}),
+      ...(product ? {
+        b1_desc: rowValue(product, "b1_desc"),
+        b1_um: rowValue(product, "b1_um"),
+      } : {}),
+    };
+  });
+}
+
+export async function fetchProtheusReturns(env, options = {}) {
+  const pageSize = boundedInteger(env.TOTVS_PAGE_SIZE, 200, 1, 200);
+  const maxRows = boundedInteger(env.COMMERCIAL_SYNC_MAX_ROWS, 10000, pageSize, 20000);
+  const now = options.now || new Date();
+  const dateRange = options.month ? billingDateRange(options.month, options.day) : null;
+  const returns = await fetchPages(
+    env,
+    (page) => buildReturnsQueryUrl(env, page, pageSize, now, dateRange),
+    maxRows,
+  );
+
+  const enrichment = await Promise.allSettled([
+    fetchBillingCustomerLookups(env, returns.rows, "f1_fornece", "f1_loja"),
+    fetchBillingProductLookups(env, returns.rows, "d1_cod"),
+  ]);
+  const customers = enrichment[0].status === "fulfilled" ? enrichment[0].value : null;
+  const products = enrichment[1].status === "fulfilled" ? enrichment[1].value : null;
+  const warnings = [customers ? "" : "SA1_lookup_unavailable", products ? "" : "SB1_lookup_unavailable"].filter(Boolean);
+  enrichment.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.warn("totvs_returns_lookup_unavailable", {
+        alias: ["SA1", "SB1"][index],
+        message: String(result.reason?.message || result.reason).slice(0, 180),
+      });
+    }
+  });
+  return {
+    rows: mergeReturnEnrichment(returns.rows, customers?.rows || [], products?.rows || []),
+    pages: returns.pages + Number(customers?.pages || 0) + Number(products?.pages || 0),
+    checkedAt: new Date().toISOString(),
+    month: options.month || "",
+    day: options.day || "",
+    enrichmentWarning: warnings.join(","),
+  };
 }
 
 export async function fetchProtheusSalesOrders(env, options = {}) {

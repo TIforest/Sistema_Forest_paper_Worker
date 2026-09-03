@@ -1,4 +1,4 @@
-import { fetchProtheusBilling, fetchProtheusSalesOrders } from "./protheus.js";
+import { fetchProtheusBilling, fetchProtheusReturns, fetchProtheusSalesOrders } from "./protheus.js";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -42,6 +42,27 @@ function numeric(input) {
   const parsed = Number(text(input).replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "")
     .replace(",", ".").replace(/[^0-9.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizedUnit(input) {
+  return text(input).normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase().replace(/[^A-Z]/g, "");
+}
+
+const TONNE_UNITS = ["T", "TO", "TON", "TNE", "TN", "TONELADA", "TONELADAS", "TONS"];
+const KILO_UNITS = ["KG", "KGS", "KILO", "KILOS", "QUILO", "QUILOS", "QUILOGRAMA", "QUILOGRAMAS"];
+const GRAM_UNITS = ["G", "GR", "GRS", "GRAMA", "GRAMAS"];
+
+// Somente unidades de peso entram nas somatorias de toneladas. Pedidos e notas
+// medidos em UN, PC, CX, MIL, M2 etc. continuam somando valor em reais, mas nao
+// contribuem com tonelagem (decisao comercial de agosto/2026).
+function quantityInTonnes(quantity, unit) {
+  const amount = numeric(quantity);
+  const normalized = normalizedUnit(unit);
+  if (TONNE_UNITS.includes(normalized)) return amount;
+  if (KILO_UNITS.includes(normalized)) return amount / 1000;
+  if (GRAM_UNITS.includes(normalized)) return amount / 1000000;
+  return 0;
 }
 
 function date(input) {
@@ -91,7 +112,7 @@ function orderFromRow(row) {
     codigoProduto,
     produto,
     produtoBase: productBase(produto),
-    unidade: text(value(row, ["unidade", "c6_unsven"])),
+    unidade: text(value(row, ["unidade", "c6_um", "b1_um", "c6_unsven"])),
     quantidade: numeric(value(row, ["quantidade", "c6_qtdven"])),
     precoUnitario: numeric(value(row, ["preco unitario", "c6_prcven"])),
     valorTotal: ["010101", "040101"].includes(filial) ? valorMercadoria * 1.0325 : valorMercadoria,
@@ -138,6 +159,7 @@ function invoiceFromRow(row) {
     pedido: text(value(row, ["pedido", "d2_pedido"])),
     itemPedido: text(value(row, ["item pedido", "d2_itempv"])),
     produtoBase: productBase(produto),
+    unidade: text(value(row, ["unidade", "d2_um", "b1_um"])),
     quantidade: numeric(value(row, ["quantidade", "d2_quant"])),
     precoUnitario: numeric(value(row, ["preco unitario", "d2_prcven"])),
     valorItem,
@@ -163,6 +185,102 @@ function invoiceFromRow(row) {
   };
 }
 
+// Classificacao das linhas vindas da SF2 (notas de SAIDA):
+//   'cancelada'         -> nota cancelada no Protheus (F2_DTCANC preenchido);
+//   'devolucao_compra'  -> F2_TIPO D/B. NAO e devolucao de venda: e a empresa
+//                          devolvendo material a um FORNECEDOR (CFOP 5xxx, e o
+//                          cadastro da contraparte esta na SA2, nao na SA1).
+//                          Fica fora do faturamento, mas nao pode ser deduzido
+//                          da receita de venda.
+//   'faturamento'       -> venda normal.
+// Devolucao de VENDA e nota de ENTRADA e vem da SF1/SD1 como 'devolucao'.
+function invoiceRecordKind(item) {
+  if (text(item?.dataCancelamento)) return "cancelada";
+  if (["D", "B"].includes(text(item?.tipoNota).toUpperCase())) return "devolucao_compra";
+  return "faturamento";
+}
+
+// Devolucao de venda: nota de ENTRADA em SF1/SD1 com F1_TIPO='D'. O cliente
+// devolvendo a mercadoria fica em F1_FORNECE/F1_LOJA (cadastro SA1), e o
+// vinculo obrigatorio com a nota faturada vem em D1_NFORI/D1_SERIORI/D1_ITEMORI.
+function returnFromRow(row) {
+  const filial = text(value(row, ["filial", "f1_filial", "d1_filial"]));
+  const documento = text(value(row, ["documento", "f1_doc", "d1_doc"]));
+  const serie = text(value(row, ["serie", "f1_serie", "d1_serie"]));
+  const itemNota = text(value(row, ["item nota", "d1_item"]));
+  const codigoProduto = text(value(row, ["codigo produto", "d1_cod"]));
+  if (!documento) return null;
+  const produto = text(value(row, ["produto", "b1_desc"]));
+  const valorItem = numeric(value(row, ["valor item", "d1_total"]));
+  return {
+    id: ["SF1", filial || "sem-filial", documento, serie || "sem-serie", itemNota || codigoProduto || "item"].join("-"),
+    filial, documento, serie, itemNota, codigoProduto, produto,
+    dataEmissao: date(value(row, ["data emissao", "f1_emissao"])),
+    codigoCliente: text(value(row, ["codigo cliente", "f1_fornece"])),
+    lojaCliente: text(value(row, ["loja cliente", "f1_loja"])),
+    cliente: text(value(row, ["cliente", "a1_nome"])),
+    cnpjCliente: taxId(value(row, ["cnpj cliente", "a1_cgc"])),
+    cidade: text(value(row, ["cidade", "a1_mun"])),
+    uf: text(value(row, ["uf", "a1_est"])),
+    codigoVendedor: "",
+    vendedor: "",
+    pedido: "",
+    itemPedido: "",
+    produtoBase: productBase(produto),
+    unidade: text(value(row, ["unidade", "d1_um", "b1_um"])),
+    quantidade: numeric(value(row, ["quantidade", "d1_quant"])),
+    precoUnitario: numeric(value(row, ["preco unitario", "d1_vunit"])),
+    valorItem,
+    desconto: 0,
+    freteNota: numeric(value(row, ["frete", "f1_frete"])),
+    seguroNota: 0,
+    despesasNota: 0,
+    ipiNota: numeric(value(row, ["ipi", "f1_valipi"])),
+    icmsNota: numeric(value(row, ["icms", "f1_valicm"])),
+    valorBrutoNota: numeric(value(row, ["valor bruto nota", "f1_valbrut"])),
+    valorMercadoriaNota: numeric(value(row, ["valor mercadoria nota", "f1_valmerc"])),
+    valorFaturadoNota: 0,
+    condicaoPagamento: "",
+    condicaoDescricao: "",
+    prazosPagamento: "",
+    mediaPagamentoDias: 0,
+    tipoNota: text(value(row, ["tipo nota", "f1_tipo"])) || "D",
+    dataCancelamento: "",
+    tes: text(value(row, ["tes", "d1_tes"])),
+    cfop: text(value(row, ["cfop", "d1_cf"])),
+    percentualComissao: 0,
+    comissaoEstimada: 0,
+    registroTipo: "devolucao",
+    origem: "SF1",
+    notaOrigem: text(value(row, ["nota origem", "d1_nfori"])),
+    serieOrigem: text(value(row, ["serie origem", "d1_seriori"])),
+    itemOrigem: text(value(row, ["item origem", "d1_itemori"])),
+  };
+}
+
+// O total da nota de devolucao e o valor bruto da SF1 (que ja contempla frete e
+// impostos). Nao somamos F1_FRETE de novo, ao contrario do faturamento, onde o
+// frete vem fora do bruto.
+function allocateReturnTotals(items) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = `${item.filial}|${item.documento}|${item.serie}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  return items.map((item) => {
+    const rows = groups.get(`${item.filial}|${item.documento}|${item.serie}`) || [item];
+    const itemTotal = rows.reduce((sum, row) => sum + Math.max(0, row.valorItem), 0);
+    const gross = Math.max(...rows.map((row) => row.valorBrutoNota));
+    const invoiceTotal = gross > 0 ? gross : itemTotal;
+    const share = itemTotal > 0 ? Math.max(0, item.valorItem) / itemTotal : 1 / rows.length;
+    const valorBrutoItem = invoiceTotal * share;
+    const tonnes = quantityInTonnes(item.quantidade, item.unidade);
+    return { ...item, valorTotalNf: invoiceTotal, valorBrutoItem,
+      precoPorTonelada: tonnes > 0 ? valorBrutoItem / tonnes : 0 };
+  });
+}
+
 function allocateInvoiceTotals(items) {
   const groups = new Map();
   for (const item of items) {
@@ -179,8 +297,9 @@ function allocateInvoiceTotals(items) {
     const invoiceTotal = (billed > 0 ? billed : (gross > 0 ? gross : itemTotal)) + freightTotal;
     const share = itemTotal > 0 ? Math.max(0, item.valorItem) / itemTotal : 1 / rows.length;
     const valorBrutoItem = invoiceTotal * share;
+    const tonnes = quantityInTonnes(item.quantidade, item.unidade);
     return { ...item, valorTotalNf: invoiceTotal, valorBrutoItem,
-      precoPorTonelada: item.quantidade > 0 ? valorBrutoItem / item.quantidade : 0 };
+      precoPorTonelada: tonnes > 0 ? valorBrutoItem / tonnes : 0 };
   });
 }
 
@@ -243,12 +362,13 @@ async function upsertInvoices(env, invoices) {
       return env.DB.prepare(`INSERT INTO commercial_invoice_items (
         id, filial, documento, serie, data_emissao, codigo_cliente, loja_cliente, cliente, cnpj_cliente,
         cidade, uf, codigo_vendedor, vendedor, pedido, item_pedido, item_nota, codigo_produto, produto,
-        quantidade, preco_unitario, valor_item, desconto, frete_nota, seguro_nota, despesas_nota,
+        unidade, quantidade, preco_unitario, valor_item, desconto, frete_nota, seguro_nota, despesas_nota,
         ipi_nota, icms_nota, valor_bruto_nota, valor_mercadoria_nota, valor_faturado_nota, tipo_nota,
         data_cancelamento, tes, cfop, percentual_comissao, comissao_estimada, erp_hash, source_updated_at,
         updated_at, condicao_pagamento, condicao_descricao, prazos_pagamento, media_pagamento_dias,
-        produto_base, valor_total_nf, valor_bruto_item, preco_por_tonelada
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        produto_base, valor_total_nf, valor_bruto_item, preco_por_tonelada, registro_tipo,
+        origem, nota_origem, serie_origem, item_origem
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET filial=excluded.filial, documento=excluded.documento, serie=excluded.serie,
         data_emissao=excluded.data_emissao, codigo_cliente=excluded.codigo_cliente, loja_cliente=excluded.loja_cliente,
         cliente=CASE WHEN excluded.cliente<>'' THEN excluded.cliente ELSE commercial_invoice_items.cliente END,
@@ -260,7 +380,7 @@ async function upsertInvoices(env, invoices) {
         pedido=excluded.pedido, item_pedido=excluded.item_pedido, item_nota=excluded.item_nota,
         codigo_produto=excluded.codigo_produto,
         produto=CASE WHEN excluded.produto<>'' THEN excluded.produto ELSE commercial_invoice_items.produto END,
-        quantidade=excluded.quantidade, preco_unitario=excluded.preco_unitario, valor_item=excluded.valor_item,
+        unidade=excluded.unidade, quantidade=excluded.quantidade, preco_unitario=excluded.preco_unitario, valor_item=excluded.valor_item,
         desconto=excluded.desconto, frete_nota=excluded.frete_nota, seguro_nota=excluded.seguro_nota,
         despesas_nota=excluded.despesas_nota, ipi_nota=excluded.ipi_nota, icms_nota=excluded.icms_nota,
         valor_bruto_nota=excluded.valor_bruto_nota, valor_mercadoria_nota=excluded.valor_mercadoria_nota,
@@ -274,17 +394,21 @@ async function upsertInvoices(env, invoices) {
         media_pagamento_dias=excluded.media_pagamento_dias,
         produto_base=CASE WHEN excluded.produto_base<>'' THEN excluded.produto_base ELSE commercial_invoice_items.produto_base END,
         valor_total_nf=excluded.valor_total_nf, valor_bruto_item=excluded.valor_bruto_item,
-        preco_por_tonelada=excluded.preco_por_tonelada
+        preco_por_tonelada=excluded.preco_por_tonelada, registro_tipo=excluded.registro_tipo,
+        origem=excluded.origem, nota_origem=excluded.nota_origem,
+        serie_origem=excluded.serie_origem, item_origem=excluded.item_origem
       WHERE commercial_invoice_items.erp_hash<>excluded.erp_hash`).bind(
         item.id, item.filial, item.documento, item.serie, item.dataEmissao, item.codigoCliente,
         item.lojaCliente, item.cliente, item.cnpjCliente, item.cidade, item.uf, item.codigoVendedor,
         item.vendedor, item.pedido, item.itemPedido, item.itemNota, item.codigoProduto, item.produto,
-        item.quantidade, item.precoUnitario, item.valorItem, item.desconto, item.freteNota, item.seguroNota,
+        item.unidade, item.quantidade, item.precoUnitario, item.valorItem, item.desconto, item.freteNota, item.seguroNota,
         item.despesasNota, item.ipiNota, item.icmsNota, item.valorBrutoNota, item.valorMercadoriaNota,
         item.valorFaturadoNota, item.tipoNota, item.dataCancelamento, item.tes, item.cfop,
         item.percentualComissao, item.comissaoEstimada, erpHash, now, now, item.condicaoPagamento,
         item.condicaoDescricao, item.prazosPagamento, item.mediaPagamentoDias, item.produtoBase,
         item.valorTotalNf, item.valorBrutoItem, item.precoPorTonelada,
+        item.registroTipo || "faturamento",
+        item.origem || "SF2", item.notaOrigem || "", item.serieOrigem || "", item.itemOrigem || "",
       );
     });
     const results = await env.DB.batch(statements);
@@ -308,6 +432,30 @@ function monthRange(month) {
   return { from: `${month}-01`, to: `${month}-${String(new Date(Date.UTC(year, monthNumber, 0)).getUTCDate()).padStart(2, "0")}` };
 }
 
+// Intervalo "De: / Ate:" do painel. Aceita um dos dois lados preenchido.
+function customRange(from, to) {
+  const start = text(from) || text(to);
+  const end = text(to) || text(from);
+  if (!start || !end) return null;
+  if (!validDay(start) || !validDay(end)) return { error: "invalid_range" };
+  if (end < start) return { error: "invalid_range" };
+  return { from: start, to: end };
+}
+
+function monthsBetween(from, to, maximum = 24) {
+  const months = [];
+  let [year, month] = from.slice(0, 7).split("-").map(Number);
+  const limit = to.slice(0, 7);
+  while (months.length < maximum) {
+    const current = `${year}-${String(month).padStart(2, "0")}`;
+    months.push(current);
+    if (current >= limit) break;
+    month += 1;
+    if (month > 12) { month = 1; year += 1; }
+  }
+  return months;
+}
+
 function allowed(user) {
   return ["admin", "diretoria", "comercial"].includes(user?.role);
 }
@@ -319,12 +467,53 @@ async function recordSync(env, status, startedAt, rows = 0, changed = 0, message
     .bind(status, rows, changed, message, startedAt, new Date().toISOString()).run();
 }
 
+// Sincroniza um unico periodo (mes fechado ou dia especifico) e grava em D1.
+async function syncCommercialPeriod(env, month, day) {
+  const [billingResult, orderResult, returnResult] = await Promise.all([
+    fetchProtheusBilling(env, { month, day }),
+    fetchProtheusSalesOrders(env, { month, day, includeInvoiced: true, commercial: true }),
+    // SF1/SD1 nao pode derrubar o fechamento comercial: se a consulta falhar,
+    // o faturamento entra do mesmo jeito e o aviso vai para o registro de sync.
+    fetchProtheusReturns(env, { month, day }).catch((error) => {
+      console.warn("totvs_returns_unavailable", { message: String(error?.message || error).slice(0, 180) });
+      return { rows: [], pages: 0, enrichmentWarning: "SF1_returns_unavailable" };
+    }),
+  ]);
+  // Devolucoes (F2_TIPO D/B) e notas canceladas (F2_DTCANC) continuam sendo
+  // gravadas, porem marcadas em registro_tipo para serem deduzidas do faturamento.
+  const invoices = allocateInvoiceTotals(billingResult.rows.map(invoiceFromRow).filter(Boolean))
+    .map((item) => ({ ...item, registroTipo: invoiceRecordKind(item), origem: "SF2" }));
+  const salesReturns = allocateReturnTotals(returnResult.rows.map(returnFromRow).filter(Boolean));
+  const records = [...invoices, ...salesReturns];
+  const orders = orderResult.rows.map(orderFromRow).filter(Boolean);
+  const range = day ? { from: day, to: day } : monthRange(month);
+  await env.DB.prepare("DELETE FROM commercial_invoice_items WHERE data_emissao >= ? AND data_emissao <= ?")
+    .bind(range.from, range.to).run();
+  const [invoiceWrite, orderWrite] = await Promise.all([upsertInvoices(env, records), upsertOrders(env, orders)]);
+  return {
+    month, day,
+    invoices: invoices.length,
+    salesReturns: salesReturns.length,
+    returns: records.filter((item) => item.registroTipo !== "faturamento").length,
+    orders: orders.length,
+    received: records.length + orders.length,
+    changed: invoiceWrite.changed + orderWrite.changed,
+    pages: Number(billingResult.pages || 0) + Number(orderResult.pages || 0) + Number(returnResult.pages || 0),
+    warnings: [billingResult.enrichmentWarning, orderResult.enrichmentWarning, returnResult.enrichmentWarning].filter(Boolean),
+  };
+}
+
 export async function syncCommercialBilling(env, actor = null, options = {}) {
   const startedAt = new Date().toISOString();
   const month = text(options.month) || startedAt.slice(0, 7);
   const day = text(options.day);
   if (!validMonth(month)) throw new Error("Mes comercial invalido");
   if (day && (!validDay(day) || !day.startsWith(`${month}-`))) throw new Error("Dia comercial invalido");
+  const selected = customRange(options.from, options.to);
+  if (selected?.error) throw new Error("Intervalo De/Ate invalido");
+  const periods = selected
+    ? monthsBetween(selected.from, selected.to, 12).map((item) => ({ month: item, day: "" }))
+    : [{ month, day }];
 
   const staleBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const lockToken = crypto.randomUUID();
@@ -335,33 +524,32 @@ export async function syncCommercialBilling(env, actor = null, options = {}) {
   if (!Number(lock.meta?.changes || 0)) return { received: 0, changed: 0, inProgress: true, updatedAt: startedAt };
 
   try {
-    const [billingResult, orderResult] = await Promise.all([
-      fetchProtheusBilling(env, { month, day }),
-      fetchProtheusSalesOrders(env, { month, day, includeInvoiced: true, commercial: true }),
-    ]);
-    const invoices = allocateInvoiceTotals(billingResult.rows.map(invoiceFromRow).filter((item) => (
-      item && !item.dataCancelamento && !["D", "B"].includes(item.tipoNota.toUpperCase())
-    )));
-    const orders = orderResult.rows.map(orderFromRow).filter(Boolean);
-    const range = day ? { from: day, to: day } : monthRange(month);
-    await env.DB.prepare("DELETE FROM commercial_invoice_items WHERE data_emissao >= ? AND data_emissao <= ?")
-      .bind(range.from, range.to).run();
-    const [invoiceWrite, orderWrite] = await Promise.all([upsertInvoices(env, invoices), upsertOrders(env, orders)]);
-    const received = invoices.length + orders.length;
-    const changed = invoiceWrite.changed + orderWrite.changed;
+    const runs = [];
+    for (const period of periods) runs.push(await syncCommercialPeriod(env, period.month, period.day));
+    const total = (key) => runs.reduce((sum, run) => sum + Number(run[key] || 0), 0);
+    const invoices = { length: total("invoices") };
+    const orders = { length: total("orders") };
+    const received = total("received");
+    const changed = total("changed");
     const source = {
-      name: "TOTVS Protheus · SC5/SC6 e SF2/SD2",
+      name: "TOTVS Protheus · SC5/SC6, SF2/SD2 e SF1/SD1 (devoluções)",
       month, day, checkedAt: new Date().toISOString(),
+      from: selected?.from || null, to: selected?.to || null,
+      months: periods.map((period) => period.month),
       billingRows: invoices.length, orderRows: orders.length,
-      pages: Number(billingResult.pages || 0) + Number(orderResult.pages || 0),
-      warnings: [billingResult.enrichmentWarning, orderResult.enrichmentWarning].filter(Boolean),
+      returnRows: total("returns"), salesReturnRows: total("salesReturns"),
+      pages: total("pages"),
+      warnings: [...new Set(runs.flatMap((run) => run.warnings))],
     };
     await env.DB.prepare(`INSERT INTO app_state (id, value, updated_at, updated_by)
       VALUES ('forestpaper:commercial-sync-source', ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by`)
       .bind(JSON.stringify(source), source.checkedAt, actor?.identityHash || "system").run();
     await recordSync(env, "success", startedAt, received, changed, null);
-    return { received, changed, invoices: invoices.length, orders: orders.length, updatedAt: source.checkedAt, source };
+    return {
+      received, changed, invoices: invoices.length, orders: orders.length,
+      returns: source.returnRows, months: source.months, updatedAt: source.checkedAt, source,
+    };
   } catch (error) {
     await recordSync(env, "error", startedAt, 0, 0, String(error?.message || error).slice(0, 500));
     throw error;
@@ -405,6 +593,34 @@ function hiddenCustomer(row) {
   return HIDDEN_FOREST_GROUP_CNPJS.has(taxId(row?.cnpj_cliente)) || text(row?.cliente).toUpperCase().includes("ONZE");
 }
 
+function klabinCustomer(row) {
+  return text(row?.cliente).toUpperCase().includes("KLABIN");
+}
+
+// Linhas gravadas antes da migracao 0018 nao tem registro_tipo: sao faturamento.
+function recordKind(row) {
+  const kind = text(row?.registro_tipo).toLowerCase();
+  return ["devolucao", "cancelada", "devolucao_compra"].includes(kind) ? kind : "faturamento";
+}
+
+// Somente devolucao de VENDA e nota cancelada abatem a receita. Devolucao de
+// compra sai do faturamento mas nao entra na deducao.
+function deductsFromBilling(row) {
+  return ["devolucao", "cancelada"].includes(recordKind(row));
+}
+
+function returnsSummary(rows) {
+  const devolucoes = invoiceSummary(rows.filter((row) => recordKind(row) === "devolucao"));
+  const canceladas = invoiceSummary(rows.filter((row) => recordKind(row) === "cancelada"));
+  const compras = invoiceSummary(rows.filter((row) => recordKind(row) === "devolucao_compra"));
+  return {
+    devolucoes: devolucoes.value, devolucoesNotas: devolucoes.count,
+    canceladas: canceladas.value, canceladasNotas: canceladas.count,
+    devolucoesCompra: compras.value, devolucoesCompraNotas: compras.count,
+    total: devolucoes.value + canceladas.value, notas: devolucoes.count + canceladas.count,
+  };
+}
+
 function invoiceSummary(items) {
   const invoices = new Map();
   for (const item of items) {
@@ -433,7 +649,10 @@ async function listCommercial(request, env, user) {
   const day = text(url.searchParams.get("day"));
   if (!validMonth(month)) return json({ error: "invalid_month" }, 400);
   if (day && (!validDay(day) || !day.startsWith(`${month}-`))) return json({ error: "invalid_day" }, 400);
-  const range = day ? { from: day, to: day } : monthRange(month);
+  // O intervalo De/Ate tem precedencia sobre mes de referencia e dia especifico.
+  const selected = customRange(url.searchParams.get("from"), url.searchParams.get("to"));
+  if (selected?.error) return json({ error: "invalid_range" }, 400);
+  const range = selected || (day ? { from: day, to: day } : monthRange(month));
   const branches = expandBranches(parseFilter(url, "branches", 20));
   const payments = parseFilter(url, "payments");
   const customers = parseFilter(url, "customers");
@@ -448,11 +667,18 @@ async function listCommercial(request, env, user) {
     bindings.push(...Array(6).fill(`%${search}%`));
   }
   const invoicesResult = await env.DB.prepare(`SELECT * FROM commercial_invoice_items WHERE ${base.join(" AND ")} ORDER BY data_emissao DESC,documento,serie,item_nota LIMIT 10000`).bind(...bindings).all();
-  const allInvoices = invoicesResult.results;
-  const regularInvoices = allInvoices.filter((row) => !text(row.cliente).toUpperCase().includes("KLABIN"));
-  const industrialInvoices = allInvoices.filter((row) => text(row.cliente).toUpperCase().includes("KLABIN"));
+  const allRecords = invoicesResult.results;
+  // Faturamento efetivo x devolucoes/notas canceladas (excluidas) do periodo.
+  const allInvoices = allRecords.filter((row) => recordKind(row) === "faturamento");
+  const allReturns = allRecords.filter((row) => recordKind(row) !== "faturamento");
+  const regularInvoices = allInvoices.filter((row) => !klabinCustomer(row));
+  const industrialInvoices = allInvoices.filter(klabinCustomer);
   const visibleInvoices = regularInvoices.filter((row) => !hiddenCustomer(row));
   const hiddenInvoices = regularInvoices.filter(hiddenCustomer);
+  const regularReturns = allReturns.filter((row) => !klabinCustomer(row));
+  const industrialReturns = allReturns.filter(klabinCustomer);
+  const visibleReturns = regularReturns.filter((row) => !hiddenCustomer(row));
+  const hiddenReturns = regularReturns.filter(hiddenCustomer);
 
   const orderBase = ["data_emissao>=?", "data_emissao<=?", "COALESCE(TRIM(condicao_pagamento),'')<>'32'"];
   const orderBindings = [range.from, range.to];
@@ -474,7 +700,7 @@ async function listCommercial(request, env, user) {
   const allPortfolio = portfolioResult.results;
   const portfolio = firstOrders(allPortfolio.filter((row) => !text(row.cliente).toUpperCase().includes("KLABIN") && !hiddenCustomer(row)));
 
-  const optionRows = [...allInvoices, ...allOrders];
+  const optionRows = [...allRecords, ...allOrders];
   const customerOptions = new Map(); const paymentOptions = new Map();
   for (const row of optionRows) {
     if (hiddenCustomer(row) || text(row.cliente).toUpperCase().includes("KLABIN")) continue;
@@ -484,17 +710,29 @@ async function listCommercial(request, env, user) {
     if (payment && payment !== "32") paymentOptions.set(payment, text(row.condicao_descricao) || payment);
   }
   const industrialSummary = invoiceSummary(industrialInvoices);
+  const industrialReturnsSummary = returnsSummary(industrialReturns);
   const lastSync = await env.DB.prepare("SELECT status,rows_received,rows_changed,error_message,finished_at FROM sync_runs WHERE source='totvs-billing' AND status<>'running' ORDER BY id DESC LIMIT 1").first();
   const sourceRow = await env.DB.prepare("SELECT value FROM app_state WHERE id='forestpaper:commercial-sync-source'").first();
   let source = null; try { source = JSON.parse(sourceRow?.value || "null"); } catch { source = null; }
   const branchMap = new Map();
   for (const row of visibleOrders) {
     const key = row.filial || ""; const current = branchMap.get(key) || { filial: key, pedidos: new Set(), valor: 0, toneladas: 0 };
-    current.pedidos.add(row.pedido); current.valor += numeric(row.valor_total); current.toneladas += numeric(row.quantidade); branchMap.set(key, current);
+    current.pedidos.add(row.pedido); current.valor += numeric(row.valor_total); current.toneladas += quantityInTonnes(row.quantidade, row.unidade); branchMap.set(key, current);
   }
+  const visibleBilling = invoiceSummary(visibleInvoices);
+  const visibleReturnsSummary = returnsSummary(visibleReturns);
   return json({
     items: visibleInvoices,
-    filters: { month, day, from: range.from, to: range.to, branches, payments, customers, search },
+    returnItems: visibleReturns,
+    returns: {
+      ...visibleReturnsSummary,
+      faturamentoBruto: visibleBilling.value,
+      faturamentoLiquido: visibleBilling.value - visibleReturnsSummary.total,
+    },
+    filters: {
+      month, day, from: range.from, to: range.to, branches, payments, customers, search,
+      range: selected ? { from: selected.from, to: selected.to } : null,
+    },
     filterOptions: {
       customers: [...customerOptions].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
       payments: [...paymentOptions].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
@@ -502,20 +740,25 @@ async function listCommercial(request, env, user) {
     salesOrders: {
       count: orderKeys.size,
       value: visibleOrders.reduce((sum, row) => sum + numeric(row.valor_total), 0),
-      tonnes: visibleOrders.reduce((sum, row) => sum + numeric(row.quantidade), 0),
+      tonnes: visibleOrders.reduce((sum, row) => sum + quantityInTonnes(row.quantidade, row.unidade), 0),
     },
     salesOrderItems: visibleOrders,
     portfolioItems: portfolio,
-    exportData: { hiddenItems: hiddenInvoices, hiddenSalesOrderItems: hiddenOrders, portfolioItems: allPortfolio },
+    exportData: {
+      hiddenItems: hiddenInvoices, hiddenSalesOrderItems: hiddenOrders,
+      portfolioItems: allPortfolio, hiddenReturnItems: hiddenReturns,
+    },
     branchTotals: [...branchMap.values()].map((row) => ({ ...row, pedidos: row.pedidos.size })),
     industrialization: {
-      orders: industrialOrders, invoices: industrialInvoices,
+      orders: industrialOrders, invoices: industrialInvoices, returns: industrialReturns,
       summary: {
+        devolucoes: industrialReturnsSummary.total,
+        devolucoesNotas: industrialReturnsSummary.notas,
         orders: new Set(industrialOrders.map((row) => `${row.filial}|${row.pedido}`)).size,
         orderValue: industrialOrders.reduce((sum, row) => sum + numeric(row.valor_total), 0),
-        tonnes: industrialOrders.reduce((sum, row) => sum + numeric(row.quantidade), 0),
+        tonnes: industrialOrders.reduce((sum, row) => sum + quantityInTonnes(row.quantidade, row.unidade), 0),
         invoices: industrialSummary.count, billing: industrialSummary.value,
-        invoiceTonnes: industrialInvoices.reduce((sum, row) => sum + numeric(row.quantidade), 0),
+        invoiceTonnes: industrialInvoices.reduce((sum, row) => sum + quantityInTonnes(row.quantidade, row.unidade), 0),
       },
     },
     updatedAt: lastSync?.finished_at || null, sync: lastSync || null, source,
@@ -530,6 +773,7 @@ export async function handleCommercialRequest(request, env, user) {
     try {
       return json(await syncCommercialBilling(env, user, {
         month: url.searchParams.get("month"), day: url.searchParams.get("day"),
+        from: url.searchParams.get("from"), to: url.searchParams.get("to"),
       }));
     } catch (error) {
       return json({ error: "sync_failed", message: String(error?.message || error) }, 502);
