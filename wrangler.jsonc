@@ -1,6 +1,10 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "producao-forest-paper",
+  // Conta onde o Worker e o D1 de producao realmente existem (Gustavo.oliveira).
+  // Fixado aqui porque a maquina usa CLOUDFLARE_ACCOUNT_ID de outra conta como
+  // padrao; sem este campo um deploy iria para a conta errada.
+  "account_id": "b780fecba22b416b28b057fef5fa7797",
   "main": "./src/worker.js",
   "compatibility_date": "2026-07-17",
   "compatibility_flags": ["nodejs_compat"],
@@ -8,7 +12,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/operador/api/*"]
   },
   "d1_databases": [
     {
@@ -33,8 +37,40 @@
     ,"FINANCE_SE2_ACTUAL_DUE_FIELD": "E2_VENCREA"
     ,"FINANCE_SE2_BALANCE_FIELD": "E2_SALDO"
     ,"FINANCE_SC7_RECEIVED_QTY_FIELD": "C7_QUJE"
+    // Link da FQ 018 copiado do SharePoint. Vazio = integracao desligada e o
+    // cartao da Qualidade volta a oferecer a planilha local como plano B.
+    // Ligado em 03/09/2026. Vazio fazia o apontamento cair no plano B, que
+    // reescreve a planilha inteira com SheetJS CE — edicao que nao grava
+    // formatacao, entao cada lancamento apagava o estilo da FQ 018 e das demais
+    // abas. Pelo Graph so a linha nova e enviada, e o arquivo nao e reserializado.
+    ,"QUALITY_WORKBOOK_URL": "https://forestpapercombr.sharepoint.com/:x:/r/sites/grupoforest/_layouts/15/Doc.aspx?sourcedoc=%7B0E34816C-4DDB-4F2B-BE64-5EF1ED2C2520%7D&file=FQ%20018%20-%20Controle%20de%20Amostragem%20Interna.xlsx&action=default&mobileredirect=true"
+    // Aba Acessos: conta e hostname consultados na GraphQL Analytics API. Nao
+    // sao segredos; o token fica em CF_ANALYTICS_TOKEN (wrangler secret put).
+    ,"CF_ACCOUNT_ID": "b780fecba22b416b28b057fef5fa7797"
+    ,"ANALYTICS_SITE_HOST": "producao-forest-paper.tiforest.workers.dev"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": true,
+      "persist": true,
+      "head_sampling_rate": 1
+    }
   },
   "triggers": {
-    "crons": ["*/15 * * * *", "*/30 * * * *"]
+    // Desalinhados de propósito: */15 dispara em :00/:15/:30/:45 (sync financeiro);
+    // 7,37 dispara em :07/:37 (sync comercial), evitando que os dois rodem juntos
+    // em :00 e :30 e dobrem o pico de CPU nesses minutos.
+    // "0 10" = 07:00 em Brasilia (UTC-3, sem horario de verao desde 2019):
+    // resumo diario de acessos e limpeza da auditoria. Padrao distinto dos
+    // demais, entao nao interfere no */15 da sincronizacao financeira.
+    "crons": ["*/15 * * * *", "7,37 * * * *", "22,52 * * * *", "0 10 * * *"]
   }
 }

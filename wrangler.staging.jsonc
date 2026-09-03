@@ -1,6 +1,8 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "producao-forest-paper-finance-staging",
+  // Mesma conta da producao (Gustavo.oliveira). Ver comentario em wrangler.jsonc.
+  "account_id": "b780fecba22b416b28b057fef5fa7797",
   "workers_dev": true,
   "preview_urls": false,
   "main": "./src/worker.js",
