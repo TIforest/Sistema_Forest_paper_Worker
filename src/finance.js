@@ -4,7 +4,13 @@ const SCREEN_EXCLUDED_TAX_IDS = new Set([
   "07155032000105", "82221730000187", "46426147000149", "43804835000107", "44286984000184",
   "46427485000103", "23291273000138", "46327432000102", "48331905000170", "55385777000103",
 ]);
+const SCREEN_EXCLUDED_TITLE_TYPES = new Set(["PA", "TX", "PIS", "COF", "ISS", "INS"]);
+const SCREEN_EXCLUDED_SUPPLIER_NAME_PATTERNS = ["FOREST", "ONZE", "GREENPAR"];
 const ALLOWED_ROLES = new Set(["financeiro", "diretoria", "admin"]);
+
+function userHasAnyRole(user, allowed) {
+  return (user?.roles || [user?.role]).some(role => allowed.has(role));
+}
 const MANUAL_STATUSES = new Set(["a vencer", "vencido", "negociado", "pago", "pagar"]);
 
 function json(value, status = 200) {
@@ -20,12 +26,36 @@ function isoDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || Number.isNaN(new Date(`${raw}T00:00:00Z`).getTime())) return "";
   return raw;
 }
-async function sha256(value) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value)));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+// Hash sincrono e barato (FNV-1a) para o payload_hash de cada titulo/pedido.
+// payload_hash e apenas informativo (nao decide se a linha e regravada), entao
+// nao vale o custo de SHA-256 assincrono por linha em cargas de milhares de
+// registros do TOTVS — isso sozinho ja estourava o limite de CPU do Worker.
+function fastHash(value) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
-function excludedSql(alias = "supplier_tax_id") {
-  return `REPLACE(REPLACE(REPLACE(${alias}, '.', ''), '/', ''), '-', '') NOT IN (${[...SCREEN_EXCLUDED_TAX_IDS].map(() => "?").join(",")})`;
+// Filtro aplicado só na tela (dashboard/listagens); o modo de exportação (Excel)
+// nunca usa isto e sempre traz o dado completo do cache.
+function screenFilter(prefix = "", { titleType = false, purchases = false } = {}) {
+  const params = [...SCREEN_EXCLUDED_TAX_IDS];
+  const clauses = [`REPLACE(REPLACE(REPLACE(${prefix}supplier_tax_id, '.', ''), '/', ''), '-', '') NOT IN (${SCREEN_EXCLUDED_TAX_IDS.size ? [...SCREEN_EXCLUDED_TAX_IDS].map(() => "?").join(",") : "''"})`];
+  for (const pattern of SCREEN_EXCLUDED_SUPPLIER_NAME_PATTERNS) {
+    clauses.push(`UPPER(${prefix}supplier_name) NOT LIKE ?`);
+    params.push(`%${pattern}%`);
+  }
+  if (titleType) {
+    clauses.push(`${prefix}title_type NOT IN (${[...SCREEN_EXCLUDED_TITLE_TYPES].map(() => "?").join(",")})`);
+    params.push(...SCREEN_EXCLUDED_TITLE_TYPES);
+  }
+  if (purchases) clauses.push(`${prefix}issue_date >= date('now','-30 days')`);
+  return { sql: clauses.join(" AND "), params };
+}
+function screenClause(prefix, exportMode, opts) {
+  return exportMode ? { sql: "1=1", params: [] } : screenFilter(prefix, opts);
 }
 async function enabled(env) {
   const row = await env.DB.prepare("SELECT enabled FROM feature_flags WHERE flag_key = 'finance_payables'").first();
@@ -35,7 +65,7 @@ function calculatedStatus(row, today) {
   if (Number(row.open_balance || 0) === 0) return "pago";
   return String(row.actual_due_date || "") < today ? "vencido" : "a vencer";
 }
-async function hashRecord(record) { return sha256(JSON.stringify(record)); }
+function hashRecord(record) { return fastHash(JSON.stringify(record)); }
 
 async function upsertPayables(env, records, syncAt) {
   let changed = 0;
@@ -44,7 +74,7 @@ async function upsertPayables(env, records, syncAt) {
   for (let offset = 0; offset < records.length; offset += 500) {
     const statements = [];
     for (const row of records.slice(offset, offset + 500)) {
-      const hash = await hashRecord(row);
+      const hash = hashRecord(row);
       statements.push(env.DB.prepare(`
         INSERT INTO finance_payables_cache (
           cache_key, branch, title_number, title_type, installment, nature, supplier_code, supplier_store,
@@ -77,7 +107,7 @@ async function upsertPurchases(env, records, syncAt) {
   for (let offset = 0; offset < records.length; offset += 500) {
     const statements = [];
     for (const row of records.slice(offset, offset + 500)) {
-      const hash = await hashRecord(row);
+      const hash = hashRecord(row);
       statements.push(env.DB.prepare(`
         INSERT INTO finance_purchase_orders_cache (
           cache_key, branch, order_number, item_number, issue_date, supplier_code, supplier_store,
@@ -140,56 +170,82 @@ async function dashboard(env) {
   const today = new Date().toISOString().slice(0, 10);
   const plus7 = new Date(`${today}T00:00:00Z`); plus7.setUTCDate(plus7.getUTCDate() + 7);
   const until = plus7.toISOString().slice(0, 10);
-  const params = [...SCREEN_EXCLUDED_TAX_IDS];
+  const payablesFilter = screenFilter("", { titleType: true });
+  const purchasesFilter = screenFilter("", { purchases: true });
   const payables = await env.DB.prepare(`
     SELECT
       COALESCE(SUM(CASE WHEN open_balance <> 0 AND actual_due_date < ? THEN open_balance ELSE 0 END),0) overdue,
       COALESCE(SUM(CASE WHEN open_balance <> 0 AND actual_due_date >= ? AND actual_due_date <= ? THEN open_balance ELSE 0 END),0) due_seven_days,
       COALESCE(SUM(CASE WHEN open_balance <> 0 THEN open_balance ELSE 0 END),0) open_total
-    FROM finance_payables_cache WHERE ${excludedSql()}
-  `).bind(today, today, until, ...params).first();
-  const purchases = await env.DB.prepare(`SELECT COALESCE(SUM(open_value),0) total FROM finance_purchase_orders_cache WHERE open_quantity > 0 AND ${excludedSql()}`)
-    .bind(...params).first();
+    FROM finance_payables_cache WHERE ${payablesFilter.sql}
+  `).bind(today, today, until, ...payablesFilter.params).first();
+  const purchases = await env.DB.prepare(`SELECT COALESCE(SUM(open_value),0) total FROM finance_purchase_orders_cache WHERE open_quantity > 0 AND ${purchasesFilter.sql}`)
+    .bind(...purchasesFilter.params).first();
   const balances = await env.DB.prepare("SELECT COALESCE(SUM(balance_value),0) total FROM finance_account_balances WHERE balance_date = ?").bind(today).first();
+  const alertsFilter = screenFilter("", { titleType: true });
   const alerts = await env.DB.prepare(`
     SELECT
       SUM(CASE WHEN first_seen_at >= datetime('now','-48 hours') AND actual_due_date < ? THEN 1 ELSE 0 END) new_near_due,
       SUM(CASE WHEN julianday(actual_due_date)-julianday(issue_date) < 7 THEN 1 ELSE 0 END) short_term
-    FROM finance_payables_cache WHERE open_balance <> 0 AND ${excludedSql()}
-  `).bind(until, ...params).first();
+    FROM finance_payables_cache WHERE open_balance <> 0 AND ${alertsFilter.sql}
+  `).bind(until, ...alertsFilter.params).first();
+  const pagarFilter = screenFilter("p.", { titleType: true });
+  const pagarMarked = await env.DB.prepare(`
+    SELECT COALESCE(SUM(p.open_balance),0) total FROM finance_payables_cache p
+    JOIN finance_status_overrides o ON o.cache_key = p.cache_key AND o.manual_status = 'pagar'
+    WHERE p.open_balance <> 0 AND ${pagarFilter.sql}
+  `).bind(...pagarFilter.params).first();
+  const settledTodayFilter = screenFilter("", { titleType: true });
+  const settledToday = await env.DB.prepare(`
+    SELECT COALESCE(SUM(original_value),0) total, COUNT(*) count FROM finance_payables_cache
+    WHERE settlement_date = date('now') AND ${settledTodayFilter.sql}
+  `).bind(...settledTodayFilter.params).first();
   const lastSync = await env.DB.prepare("SELECT status,duration_ms,error_message,finished_at FROM finance_sync_runs ORDER BY id DESC LIMIT 1").first();
   const required = Number(payables?.overdue || 0) + Number(payables?.due_seven_days || 0);
   const available = Number(balances?.total || 0);
-  return { today, until, overdue: Number(payables?.overdue || 0), dueSevenDays: Number(payables?.due_seven_days || 0), openTotal: Number(payables?.open_total || 0), purchaseOpenTotal: Number(purchases?.total || 0), accountBalance: available, required, availabilityGap: available - required, alerts: { newNearDue: Number(alerts?.new_near_due || 0), shortTerm: Number(alerts?.short_term || 0) }, lastSync };
+  const currentAvailable = available - Number(pagarMarked?.total || 0) - Number(settledToday?.total || 0);
+  return { today, until, overdue: Number(payables?.overdue || 0), dueSevenDays: Number(payables?.due_seven_days || 0), openTotal: Number(payables?.open_total || 0), purchaseOpenTotal: Number(purchases?.total || 0), accountBalance: available, required, availabilityGap: available - required, currentAvailable, settledToday: { total: Number(settledToday?.total || 0), count: Number(settledToday?.count || 0) }, alerts: { newNearDue: Number(alerts?.new_near_due || 0), shortTerm: Number(alerts?.short_term || 0) }, lastSync };
 }
 
 async function listPayables(env, url, paid = false, exportMode = false) {
   const page = positiveInteger(url.searchParams.get("page"), 1, 100000);
   const pageSize = positiveInteger(url.searchParams.get("pageSize"), 50, 200);
-  const where = paid ? "p.open_balance = 0" : "p.open_balance <> 0";
-  const screenFilter = exportMode ? "" : ` AND ${excludedSql("p.supplier_tax_id")}`;
-  const binds = exportMode ? [] : [...SCREEN_EXCLUDED_TAX_IDS];
-  const count = await env.DB.prepare(`SELECT COUNT(*) total FROM finance_payables_cache p WHERE ${where}${screenFilter}`).bind(...binds).first();
+  const allMode = !exportMode && !paid && url.searchParams.get("all") === "true";
+  const where = [paid ? "p.open_balance = 0" : "p.open_balance <> 0"];
+  const filter = screenClause("p.", exportMode, { titleType: true });
+  where.push(filter.sql);
+  const binds = [...filter.params];
+  if (paid && !exportMode) {
+    const day = isoDate(url.searchParams.get("day"));
+    const month = /^\d{4}-\d{2}$/.test(url.searchParams.get("month") || "") ? url.searchParams.get("month") : "";
+    if (day) { where.push("p.settlement_date = ?"); binds.push(day); }
+    else if (month) { where.push("substr(p.settlement_date,1,7) = ?"); binds.push(month); }
+    else where.push("p.settlement_date = date('now','-1 day')");
+  }
+  const whereSql = where.join(" AND ");
+  const count = await env.DB.prepare(`SELECT COUNT(*) total FROM finance_payables_cache p WHERE ${whereSql}`).bind(...binds).first();
+  const limitSql = exportMode ? "" : allMode ? "LIMIT 5000" : "LIMIT ? OFFSET ?";
   const query = `
-    SELECT p.*, o.manual_status, o.updated_at status_updated_at, o.updated_by_name,
+    SELECT p.*, c.category supplier_category, o.manual_status, o.updated_at status_updated_at, o.updated_by_name,
       CASE WHEN p.open_balance = 0 THEN 'pago' WHEN p.actual_due_date < date('now') THEN 'vencido' ELSE 'a vencer' END calculated_status
-    FROM finance_payables_cache p LEFT JOIN finance_status_overrides o ON o.cache_key=p.cache_key
-    WHERE ${where}${screenFilter}
+    FROM finance_payables_cache p
+    LEFT JOIN finance_status_overrides o ON o.cache_key=p.cache_key
+    LEFT JOIN finance_supplier_categories c ON c.supplier_code=p.supplier_code
+    WHERE ${whereSql}
     ORDER BY p.actual_due_date, p.branch, p.title_number, p.installment
-    ${exportMode ? "" : "LIMIT ? OFFSET ?"}`;
-  const queryBinds = exportMode ? binds : [...binds, pageSize, (page - 1) * pageSize];
+    ${limitSql}`;
+  const queryBinds = exportMode || allMode ? binds : [...binds, pageSize, (page - 1) * pageSize];
   const result = await env.DB.prepare(query).bind(...queryBinds).all();
-  return { items: result.results.map((row) => ({ ...row, status: row.manual_status || row.calculated_status })), page, pageSize, total: Number(count?.total || 0), exportMode };
+  return { items: result.results.map((row) => ({ ...row, status: row.manual_status || row.calculated_status })), page, pageSize, total: Number(count?.total || 0), exportMode, allMode };
 }
 
 async function listPurchases(env, url, exportMode = false) {
   const page = positiveInteger(url.searchParams.get("page"), 1, 100000);
   const pageSize = positiveInteger(url.searchParams.get("pageSize"), 50, 200);
-  const screenFilter = exportMode ? "" : ` AND ${excludedSql("supplier_tax_id")}`;
-  const binds = exportMode ? [] : [...SCREEN_EXCLUDED_TAX_IDS];
-  const count = await env.DB.prepare(`SELECT COUNT(*) total FROM finance_purchase_orders_cache WHERE open_quantity > 0${screenFilter}`).bind(...binds).first();
-  const result = await env.DB.prepare(`SELECT * FROM finance_purchase_orders_cache WHERE open_quantity > 0${screenFilter} ORDER BY issue_date DESC,branch,order_number,item_number ${exportMode ? "" : "LIMIT ? OFFSET ?"}`)
-    .bind(...(exportMode ? binds : [...binds, pageSize, (page - 1) * pageSize])).all();
+  const filter = screenClause("", exportMode, { purchases: true });
+  const count = await env.DB.prepare(`SELECT COUNT(*) total FROM finance_purchase_orders_cache WHERE open_quantity > 0 AND ${filter.sql}`).bind(...filter.params).first();
+  const result = await env.DB.prepare(`SELECT * FROM finance_purchase_orders_cache WHERE open_quantity > 0 AND ${filter.sql} ORDER BY issue_date DESC,branch,order_number,item_number ${exportMode ? "" : "LIMIT ? OFFSET ?"}`)
+    .bind(...(exportMode ? filter.params : [...filter.params, pageSize, (page - 1) * pageSize])).all();
   return { items: result.results, page, pageSize, total: Number(count?.total || 0), exportMode };
 }
 
@@ -204,11 +260,11 @@ async function listAlerts(env, url) {
     ? "p.first_seen_at >= datetime('now','-48 hours') AND p.actual_due_date < ?"
     : "julianday(p.actual_due_date)-julianday(p.issue_date) < 7";
   const ruleBinds = type === "new" ? [until] : [];
-  const exclusion = [...SCREEN_EXCLUDED_TAX_IDS];
-  const total = await env.DB.prepare(`SELECT COUNT(*) total FROM finance_payables_cache p WHERE p.open_balance <> 0 AND ${rule} AND ${excludedSql("p.supplier_tax_id")}`)
-    .bind(...ruleBinds, ...exclusion).first();
-  const result = await env.DB.prepare(`SELECT p.* FROM finance_payables_cache p WHERE p.open_balance <> 0 AND ${rule} AND ${excludedSql("p.supplier_tax_id")} ORDER BY p.actual_due_date,p.branch,p.title_number LIMIT ? OFFSET ?`)
-    .bind(...ruleBinds, ...exclusion, pageSize, (page - 1) * pageSize).all();
+  const filter = screenFilter("p.", { titleType: true });
+  const total = await env.DB.prepare(`SELECT COUNT(*) total FROM finance_payables_cache p WHERE p.open_balance <> 0 AND ${rule} AND ${filter.sql}`)
+    .bind(...ruleBinds, ...filter.params).first();
+  const result = await env.DB.prepare(`SELECT p.* FROM finance_payables_cache p WHERE p.open_balance <> 0 AND ${rule} AND ${filter.sql} ORDER BY p.actual_due_date,p.branch,p.title_number LIMIT ? OFFSET ?`)
+    .bind(...ruleBinds, ...filter.params, pageSize, (page - 1) * pageSize).all();
   return { type, items: result.results, total: Number(total?.total || 0), page, pageSize };
 }
 
@@ -250,7 +306,7 @@ async function balances(request, env, user, url) {
 export async function handleFinanceRequest(request, env, user) {
   const started = Date.now();
   const url = new URL(request.url);
-  if (!ALLOWED_ROLES.has(user.role)) return json({ error: "forbidden" }, 403);
+  if (!userHasAnyRole(user, ALLOWED_ROLES)) return json({ error: "forbidden" }, 403);
   if (url.pathname === "/api/finance/feature") {
     if (request.method === "GET") return json({ enabled: await enabled(env) });
     if (request.method === "PUT" && user.role === "admin") {

@@ -22,10 +22,17 @@ function number(value) {
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
+// Monta um mapa com chaves em minusculo uma unica vez por linha, em vez de
+// varrer Object.entries() a cada campo lido (custava O(campos x chaves) por
+// linha e estourava o limite de CPU do Worker em cargas de milhares de
+// titulos/pedidos vindos do TOTVS).
+function rowLookup(row) {
+  const map = new Map();
+  for (const [key, value] of Object.entries(row || {})) map.set(key.toLowerCase(), value);
+  return map;
+}
 function field(row, name) {
-  const wanted = name.toLowerCase();
-  const entry = Object.entries(row || {}).find(([key]) => key.toLowerCase() === wanted);
-  return entry?.[1];
+  return row.get(name.toLowerCase());
 }
 function date(value) {
   const raw = text(value);
@@ -123,7 +130,8 @@ export function buildPurchaseOrdersUrl(env, page, pageSize, now = new Date()) {
   });
 }
 
-function payableFromRow(env, row) {
+function payableFromRow(env, rawRow) {
+  const row = rowLookup(rawRow);
   const actualDueField = text(env.FINANCE_SE2_ACTUAL_DUE_FIELD || "E2_VENCREA");
   const balanceField = text(env.FINANCE_SE2_BALANCE_FIELD || "E2_SALDO");
   const branch = text(field(row, "E2_FILIAL"));
@@ -140,7 +148,8 @@ function payableFromRow(env, row) {
   };
 }
 
-function purchaseFromRow(env, row) {
+function purchaseFromRow(env, rawRow) {
+  const row = rowLookup(rawRow);
   const receivedField = text(env.FINANCE_SC7_RECEIVED_QTY_FIELD || "C7_QUJE");
   const ordered = number(field(row, "C7_QUANT"));
   const received = number(field(row, receivedField));
