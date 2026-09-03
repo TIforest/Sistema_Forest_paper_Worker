@@ -33,7 +33,7 @@ O portal não deve voltar a usar `localStorage` como banco principal. O armazena
 | `src/protheus.js` | Construção e execução das consultas GenericQuery, paginação e enriquecimento SA1/SB1/SA3/SE4. |
 | `migrations/` | Histórico do schema D1. Nunca altere migration já aplicada; crie a próxima migration numerada. |
 | `scripts/build.mjs` | Valida dados sensíveis e gera `dist/`. |
-| `scripts/test-production-flow.mjs` | Teste integrado local de perfis, D1, fluxo, comercial e frontend. |
+| ~~`scripts/test-production-flow.mjs`~~ | **Removido em 02/09/2026** — importava funcoes inexistentes no codigo. Divida registrada em `docs/divida-teste-fluxo-producao.md`. |
 | `scripts/test-protheus-query.mjs` | Testes das URLs, filtros, paginação e enriquecimento TOTVS. |
 | `scripts/provision-user.mjs` | Gera SQL com hash do e-mail, sem armazenar o e-mail puro. |
 | `wrangler.jsonc` | Configuração do Worker, D1, assets, variáveis e Cron. |
@@ -158,16 +158,21 @@ Aliases principais:
 
 Situação importante de agosto/2026: foi desfeita a exigência de que uma nota estivesse simultaneamente na SF1 e SF2. O faturamento atual consulta SF2 + SD2. Não reintroduza o join SF1/SF2 sem uma nova decisão formal do negócio.
 
+Atualização de 27/08/2026 (decisão do negócio): a SF1/SD1 voltou ao sistema **apenas para devoluções de venda**, nunca para compor faturamento. Devolução de venda é nota de ENTRADA (`F1_TIPO = 'D'`), com o cliente em `F1_FORNECE`/`F1_LOJA` (cadastro SA1, não SA2) e vínculo obrigatório com a nota faturada em `D1_NFORI` / `D1_SERIORI` / `D1_ITEMORI`. A coluna `origem` (`SF2` ou `SF1`) separa a procedência de cada linha. `F2_TIPO = 'D'`/`'B'` na SF2 é devolução de **compra** (nós devolvendo ao fornecedor: CFOP de saída 5xxx e contraparte na SA2). Ela é classificada como `devolucao_compra`, fica **fora do faturamento** mas **não abate a receita de venda** — só `devolucao` (SF1) e `cancelada` entram na dedução. Isso corrigiu uma dedução indevida de R$ 21.060,81 em agosto/2026, quando duas notas de saída (CFOP 5556 e 5949) estavam abatendo a receita. Fora de escopo: devolução de remessa em poder de terceiros, que usa nota tipo `N` e se identifica pelo TES (`F4_PODER3 = 'D'`), não pelo tipo da nota.
+
 Todas as consultas devem manter `D_E_L_E_T_ <> '*'` para cada alias consultado.
 
 Regras de consulta:
 
 - paginação padrão de 200 registros;
 - limite comercial de 10.000 linhas por sincronização;
-- consultas comerciais são recortadas por mês e, opcionalmente, por dia;
+- consultas comerciais são recortadas por mês e, opcionalmente, por dia ou pelo intervalo `De:`/`Até:`;
+- o intervalo `De:`/`Até:` tem precedência sobre mês + dia e, na sincronização, cobre até 12 meses;
 - condição de pagamento 32 é excluída na origem;
 - pedidos operacionais consideram janela padrão de 120 dias;
-- notas canceladas e devoluções são excluídas pelas regras em `billingItemFromRow`;
+- notas canceladas e devoluções **não são mais descartadas**: `invoiceRecordKind` as classifica em
+  `registro_tipo` (`faturamento` / `devolucao` / `cancelada`) e elas são gravadas em D1 para poderem
+  ser deduzidas do faturamento gerencial (migração `0018_commercial_returns.sql`);
 - falha de enriquecimento em SA1/SB1/SA3/SE4 não deve derrubar a consulta principal; o Worker registra aviso e mantém os dados disponíveis.
 
 Não exponha credenciais TOTVS ao navegador. Toda chamada ao Protheus deve sair do Worker.
@@ -178,16 +183,21 @@ O painel se chama **Gestão Comercial**. O conteúdo completo usa uma faixa flui
 
 Visão atual:
 
-- filtros por mês, dia opcional, filial, cliente, condição e busca;
-- quadro **Unidade de Negócios** primeiro;
+- filtros por mês, dia opcional, intervalo `De:`/`Até:`, filial, cliente, condição e busca;
+- quadro **Unidade de Negócios** primeiro, com o valor faturado já líquido de devoluções e notas excluídas;
+- quadro **Devoluções** logo abaixo, por filial e com um cartão de total do grupo — somente valores,
+  sem toneladas: devoluções no mês, notas excluídas no mês, faturamento bruto e faturamento líquido;
 - pedidos a faturar: SC5/SC6;
 - faturamento: SF2/SD2;
-- Industrialização Klabin em bloco separado;
-- consolidado chamado **Total do Grupo**;
+- Industrialização Klabin em bloco separado, logo após as devoluções;
+- as antigas faixas de KPI **Pedidos a faturar** e **Faturamento** entre as filiais e o consolidado foram removidas;
+- consolidado chamado **Total do Grupo**, cujo **Valor total faturado** é líquido de devoluções e notas excluídas;
 - sem metas e sem painel por vendedor;
 - vendedores continuam presentes na exportação Excel;
 - tabela final por filial e linha com cliente, produto base, quantidade, valor, preço por tonelada, vendedor e prazos de pagamento;
-- pedidos em KG são convertidos para toneladas somente na visualização; o Excel mantém quantidade e unidade originais;
+- só itens em toneladas, quilos ou gramas somam tonelagem no painel; itens em qualquer outra unidade
+  (UN, PC, CX, MIL, M2, sem unidade) entram apenas no valor em reais e a tabela de detalhamento mostra a
+  quantidade e a unidade originais no lugar de toneladas; o Excel mantém quantidade e unidade originais;
 - Excel preserva campos detalhados e filiais originais.
 
 ### Filiais
@@ -213,7 +223,10 @@ Cadastros do próprio grupo Forest e cliente cujo nome contenha `ONZE` são ocul
 - Pedido gerencial: soma de `C6_VALOR`, com fator de IPI somente nas filiais indicadas.
 - Faturamento: total único por filial/documento/série, usando valores da SF2 e acrescentando frete conforme a alocação implementada.
 - Não somar `valor_total_nf` uma vez por item sem deduplicar a nota; use `commercialInvoiceTotal`/`commercialInvoices`.
-- Notas canceladas e devoluções não entram nos totais.
+- Notas canceladas (`F2_DTCANC`) e devoluções (`F2_TIPO` D/B) não entram no faturamento bruto: ficam em
+  `registro_tipo` e são deduzidas para formar o faturamento líquido das unidades e do Total do Grupo.
+- O Excel leva tudo: abas `Unidades de negócio`, `Devoluções` (item a item, inclusive clientes ocultos e
+  Industrialização Klabin) e `Devoluções por filial`.
 
 ## 9. Excel e Microsoft Graph
 

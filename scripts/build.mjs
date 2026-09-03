@@ -1,8 +1,11 @@
-import { cp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 
 const root = new URL('../', import.meta.url);
 const checkOnly = process.argv.includes('--check');
+// A versao mostrada na barra lateral vem do package.json e e carimbada aqui:
+// um unico lugar para subir o numero antes de publicar.
+const VERSION_TOKEN = '__APP_VERSION__';
 const blockedExtensions = new Set(['.xlsx', '.xls', '.xlsm', '.csv', '.tsv']);
 const blockedNames = [/^\.env($|\.)/i, /credential/i, /secret/i, /config\.local/i];
 const sensitivePatterns = [
@@ -28,7 +31,11 @@ const files = await walk(root);
 const forbidden = files.filter(file => blockedExtensions.has(extname(file.name).toLowerCase()) || blockedNames.some(pattern => pattern.test(file.name)));
 if (forbidden.length) throw new Error(`Arquivos proibidos no repositorio: ${forbidden.map(file => file.relative).join(', ')}`);
 
+const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
 const html = await readFile(new URL('app.html', root), 'utf8');
+if (!html.includes(VERSION_TOKEN)) {
+  throw new Error(`O app.html perdeu o marcador ${VERSION_TOKEN} da versao exibida na barra lateral.`);
+}
 for (const pattern of sensitivePatterns) {
   if (pattern.test(html)) throw new Error(`Possivel dado sensivel encontrado no app.html: ${pattern}`);
 }
@@ -43,11 +50,13 @@ if (!checkOnly) {
   const dist = new URL('dist/', root);
   await rm(dist, { recursive: true, force: true });
   await mkdir(dist, { recursive: true });
-  await cp(new URL('app.html', root), new URL('index.html', dist));
+  await writeFile(new URL('index.html', dist), html.replaceAll(VERSION_TOKEN, pkg.version), 'utf8');
   for (const file of ['_headers', 'robots.txt']) await cp(new URL(file, root), new URL(file, dist));
   await cp(new URL('assets/', root), new URL('assets/', dist), { recursive: true });
+  await mkdir(new URL('assets/vendor/', dist), { recursive: true });
+  await cp(new URL('node_modules/xlsx/dist/xlsx.full.min.js', root), new URL('assets/vendor/xlsx.full.min.js', dist));
   if (await readFile(new URL('forest-icon.png', root)).catch(() => null)) await cp(new URL('forest-icon.png', root), new URL('forest-icon.png', dist));
-  console.log('Pacote de publicacao criado em dist/.');
+  console.log(`Pacote de publicacao criado em dist/ (versao ${pkg.version}).`);
 } else {
-  console.log('Verificacao concluida sem dados sensiveis conhecidos.');
+  console.log(`Verificacao concluida sem dados sensiveis conhecidos (versao ${pkg.version}).`);
 }
